@@ -80,6 +80,17 @@ export const Gnomelet = GObject.registerClass(
 
             this.actor._delegate = this; // Fix for DND source identification
 
+            // --- Doom: Combat State ---
+            this._hp              = 0;   // 0 = invulnerável (personagens originais)
+            this._maxHp           = 0;
+            this._isDead          = false;
+            this._stunTimer       = 0;
+            this._stunDuration    = 8;
+            this._deathTimer      = 0;
+            this._deathDuration   = 25;
+            this._spawnTimer      = 0;
+            this._markedForRemoval = false;
+
             // Set initial layer based on context (Fix for maximized window visibility)
             this._resetLayer();
             this.actor.set_position(this._x, this._y);
@@ -112,16 +123,10 @@ export const Gnomelet = GObject.registerClass(
             const themeContext = St.ThemeContext.get_for_stage(global.stage);
             const interfaceScale = themeContext ? themeContext.scale_factor : 1;
 
-            // St.Icon applies the interface scale to the rendered size.
-            // To ensure the visual size matches our expected logical size (settingsScale),
-            // we must divide by the interface scale.
             let iconSizeParam = Math.floor(settingsScale / interfaceScale);
             if (iconSizeParam < 1) iconSizeParam = 1;
 
-            // The actual visual height will be iconSizeParam * interfaceScale
             this._displayH = iconSizeParam * interfaceScale;
-
-            // Update width based on aspect ratio
             this._displayW = Math.floor(this._displayH * (this._frameWidth / this._frameHeight));
 
             return iconSizeParam;
@@ -135,10 +140,8 @@ export const Gnomelet = GObject.registerClass(
 
             let iconSize = this._updateDimensions();
 
-            // Update the visual size of the icon
             this._icon.set_icon_size(iconSize);
 
-            // Adjust Y position so feet stay at the same ground level
             this._y = this._y + oldH - this._displayH;
             this.actor.set_position(this._x, this._y);
         }
@@ -149,9 +152,35 @@ export const Gnomelet = GObject.registerClass(
         updateJumpPower() {
             let power = this._settings.get_int('jump-power');
             this._jumpVelocity = -Math.abs(power);
-            // Re-calculate derived constants
             this._jumpReachX = (WALK_SPEED * 2) * Math.abs(this._jumpVelocity / GRAVITY);
             this._maxJumpHeight = (this._jumpVelocity * this._jumpVelocity) / (2 * GRAVITY);
+        }
+
+        /**
+         * Doom: Recebe dano. hp=0 na classe base = invulnerável.
+         */
+        takeDamage(amount) {
+            if (this._maxHp === 0 || this._isDead) return;
+            this._hp -= amount;
+            if (this._hp <= 0) {
+                this._hp = 0;
+                this._state = State.STUNNED;
+                this._stunTimer = this._stunDuration;
+            } else {
+                this._state = State.STUNNED;
+                this._stunTimer = this._stunDuration;
+            }
+        }
+
+        /**
+         * Doom: Chamado quando a animação de morte termina.
+         * Comportamento padrão: respawn (compatível com personagens originais).
+         * Subclasses sobrescrevem para destruir a entidade.
+         */
+        _onDeathComplete() {
+            this._isDead = false;
+            this._hp = this._maxHp;
+            this._respawn();
         }
 
         /**
@@ -160,7 +189,6 @@ export const Gnomelet = GObject.registerClass(
         _updateInteraction() {
             let allowInteraction = this._settings.get_boolean('allow-interaction');
 
-            // If allowed and not yet draggable, make it draggable
             if (allowInteraction) {
                 if (!this._draggable) {
                     this.actor.reactive = true;
@@ -169,9 +197,6 @@ export const Gnomelet = GObject.registerClass(
                     this._dragEndId = this._draggable.connect('drag-end', this._onDragEnd.bind(this));
                 }
             } else {
-                // To disable, we make the actor non-reactive.
-                // We don't remove the draggable instance as it's bound to the actor,
-                // but reactivity controls the mouse events.
                 this.actor.reactive = false;
             }
         }
@@ -181,47 +206,37 @@ export const Gnomelet = GObject.registerClass(
             this._vx = 0;
             this._vy = 0;
             this._updateAnimation();
-            this._dragHistory = []; // Initialize drag history for momentum calculation
+            this._dragHistory = [];
             this._dropTime = 0;
 
-            // Create a full-screen transparent overlay to capture the drop event
-            // This prevents the shell crash caused by unhiding the source actor from pick
             this._dragOverlay = new Clutter.Actor({
                 width: global.stage.width,
                 height: global.stage.height,
                 reactive: true
             });
-            this._dragOverlay._delegate = this; // Route drag events to this Gnomelet instance
+            this._dragOverlay._delegate = this;
             Main.layoutManager.uiGroup.add_child(this._dragOverlay);
         }
 
         handleDragOver(source, actor, x, y) {
-            // Track mouse history for momentum calculation
             if (!this._dragHistory) this._dragHistory = [];
 
-            // Limit history to last ~300ms or 10 points to keep it relevant
             const now = Date.now();
             this._dragHistory.push({ x, y, time: now });
 
-            // Prune old history
             const HISTORY_LIMIT_MS = 200;
             while (this._dragHistory.length > 0 && now - this._dragHistory[0].time > HISTORY_LIMIT_MS) {
                 this._dragHistory.shift();
             }
 
-            // We accept drag over from ourselves (or potentially others if we wanted)
             return DND.DragMotionResult.MOVE_DROP;
         }
 
         acceptDrop(source, actor, x, y, time) {
-            // Update internal coordinates
             this._x = actor.x;
             this._y = actor.y;
-            this._dropTime = time; // Capture drop time for momentum check
+            this._dropTime = time;
 
-            // CRITICAL: Reparent to window_group to save it from dnd.js auto-destruction.
-            // dnd.js attempts to destroy the drag actor if it is found in Main.uiGroup after a successful drop.
-            // We temporarily move it to window_group to bypass that check.
             let parent = this.actor.get_parent();
             if (parent === Main.layoutManager.uiGroup) {
                 Main.layoutManager.removeChrome(this.actor);
@@ -241,35 +256,28 @@ export const Gnomelet = GObject.registerClass(
                 this._dragOverlay = null;
             }
 
-            // Update internal coordinates to match where the actor ended up
             this._x = this.actor.x;
             this._y = this.actor.y;
 
-            // Reset visual transforms that might be corrupted by external DND logic
             this.actor.rotation_angle_z = 0;
             this.actor.scale_y = 1;
-            this.actor.scale_x = 1; // Ensure container is not flipped
+            this.actor.scale_x = 1;
             this.actor.opacity = 255;
 
-            // Re-apply correct facing (scale_x)
             this._icon.set_pivot_point(0.5, 0.5);
             this._icon.scale_x = this.facingRight ? 1 : -1;
 
             this._state = State.FALLING;
 
-            // Calculate and apply momentum from drag
             const momentum = this._calculateMomentum();
             this._vx = momentum.vx;
             this._vy = momentum.vy;
 
-            // Now that the drag flow is complete and dnd.js is satisfied, 
-            // put the actor back in the correct layer (which might be uiGroup).
             this._resetLayer();
         }
 
         /**
          * Calculates velocity based on drag history.
-         * Returns values in pixels/frame (consistent with update loop).
          */
         _calculateMomentum() {
             if (!this._dragHistory || this._dragHistory.length < 2) {
@@ -278,16 +286,12 @@ export const Gnomelet = GObject.registerClass(
 
             const last = this._dragHistory[this._dragHistory.length - 1];
 
-            // If the last drag event was too long ago (e.g. user paused before dropping), 
-            // momentum should be zero.
             if (this._dropTime && (this._dropTime - last.time > 100)) {
                 return { vx: 0, vy: 0 };
             }
 
-            // Look back ~100ms for a good average, but ensure we have at least 2 points
             let prev = this._dragHistory[0];
 
-            // Try to find a sample roughly 50-100ms ago
             for (let i = this._dragHistory.length - 2; i >= 0; i--) {
                 const sample = this._dragHistory[i];
                 const dt = last.time - sample.time;
@@ -300,20 +304,14 @@ export const Gnomelet = GObject.registerClass(
             const dt = last.time - prev.time;
             if (dt <= 0) return { vx: 0, vy: 0 };
 
-            // Calculate pixels per ms
             const vX_ms = (last.x - prev.x) / dt;
             const vY_ms = (last.y - prev.y) / dt;
 
-            // Convert to pixels per frame (50ms)
-            // Scaling factor can be tweaked for "feel". 
-            // 1.0 would be mathematically correct if the update loop was perfectly timed and physics were continuous.
-            // A slight boost might make it feel more "swishy".
             const SCALE_FACTOR = 0.25;
 
             let vx = vX_ms * UPDATE_INTERVAL_MS * SCALE_FACTOR;
             let vy = vY_ms * UPDATE_INTERVAL_MS * SCALE_FACTOR;
 
-            // Clamp max velocity to prevent exploding offscreen
             const MAX_VELOCITY = 50;
             vx = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, vx));
             vy = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, vy));
@@ -322,7 +320,7 @@ export const Gnomelet = GObject.registerClass(
         }
 
         /**
-         * Serializes the state for persistence
+         * Serializes the state for persistence.
          */
         serialize() {
             return {
@@ -333,18 +331,17 @@ export const Gnomelet = GObject.registerClass(
                 vy: this._vy,
                 state: this._state,
                 facing: this._savedFacing,
-                idleTimer: this._idleTimer
+                idleTimer: this._idleTimer,
+                hp: this._hp,
             };
         }
 
         /**
-         * Restores saved state
+         * Restores saved state.
          */
         deserialize(data) {
             if (!data) return;
 
-
-            // Handle type change if the saved state has a different gnomelet type
             if (data.type && data.type !== this._typeName && this._resourceProvider) {
                 let res = this._resourceProvider(data.type);
                 if (res) {
@@ -363,17 +360,49 @@ export const Gnomelet = GObject.registerClass(
             if (data.state !== undefined) this._state = data.state;
             if (data.facing !== undefined) this._savedFacing = data.facing;
             if (data.idleTimer !== undefined) this._idleTimer = data.idleTimer;
+            if (data.hp !== undefined) this._hp = data.hp;
 
             this.actor.set_position(this._x, this._y);
-            this.setFrame(this._frame); // Refresh frame in case type changed
+            this.setFrame(this._frame);
         }
 
         /**
          * Main update loop for the gnomelet.
          */
-        update(windows, forceBackground, dockContainer) {
+        update(windows, forceBackground, dockContainer, allEntities = [], projectiles = []) {
             if (!this.actor) return; // Guard against updates after destruction
+
             if (this._state === State.DRAGGING) {
+                this._updateAnimation();
+                return;
+            }
+
+            // --- Doom: Guards de estado de combate ---
+            if (this._isDead) {
+                this._deathTimer--;
+                if (this._deathTimer <= 0) this._onDeathComplete();
+                this._updateAnimation();
+                return;
+            }
+
+            if (this._state === State.STUNNED) {
+                this._stunTimer--;
+                if (this._stunTimer <= 0) {
+                    if (this._hp <= 0) {
+                        this._state = State.DYING;
+                        this._deathTimer = this._deathDuration;
+                        this._isDead = true;
+                    } else {
+                        this._pickNewAction();
+                    }
+                }
+                this._updateAnimation();
+                return;
+            }
+
+            if (this._state === State.SPAWNING) {
+                this._spawnTimer--;
+                if (this._spawnTimer <= 0) this._pickNewAction();
                 this._updateAnimation();
                 return;
             }
@@ -397,7 +426,6 @@ export const Gnomelet = GObject.registerClass(
             let feetX = this._x + this._displayW / 2;
             let feetY = this._y + this._displayH;
 
-            // Find monitors containing the X coordinate
             let monitors = Main.layoutManager.monitors.filter(m => feetX >= m.x && feetX < m.x + m.width);
 
             let currentMonitor = null;
@@ -406,7 +434,6 @@ export const Gnomelet = GObject.registerClass(
             } else if (monitors.length === 1) {
                 currentMonitor = monitors[0];
             } else {
-                // Handle vertically stacked monitors
                 monitors.sort((a, b) => a.y - b.y);
                 currentMonitor = monitors.find(m => feetY < m.y + m.height);
                 if (!currentMonitor) currentMonitor = monitors[monitors.length - 1];
@@ -414,7 +441,7 @@ export const Gnomelet = GObject.registerClass(
 
             let floorY = currentMonitor.y + currentMonitor.height;
 
-            // Ceiling collision to prevent jumping off-screen and disappearing
+            // Ceiling collision
             if (this._y < currentMonitor.y) {
                 this._y = currentMonitor.y;
                 this._vy = 0;
@@ -424,13 +451,11 @@ export const Gnomelet = GObject.registerClass(
             let onFloorLevel = (this._y + this._displayH) >= floorY - 10;
 
             if (onFloorLevel) {
-                // If walking outside horizontal bounds of the stage, respawn at the top
                 if (this._x < -this._displayW || this._x > global.stage.width) {
                     this._respawn();
                     return;
                 }
             } else {
-                // Routine Wall Bounce when in air or on windows
                 let maxX = global.stage.width - this._displayW;
                 if (this._x < 0) {
                     this._x = 0;
@@ -445,11 +470,10 @@ export const Gnomelet = GObject.registerClass(
             let onGround = false;
             let landedOnWindow = null;
 
-            if (this._vy >= 0) { // Only collide if falling downwards
+            if (this._vy >= 0) {
                 for (let win of windows) {
                     let rect = win.rect;
 
-                    // Hitbox: Feet within window width AND close to top edge
                     let prevFeetY = prevY + this._displayH;
                     let inHorizontalRange = (feetX >= rect.x) && (feetX <= rect.x + rect.width);
                     let inVerticalRange = (feetY >= rect.y) && (prevFeetY <= rect.y + 25);
@@ -463,7 +487,6 @@ export const Gnomelet = GObject.registerClass(
                     }
                 }
 
-                // Allow landing on screen bottom (Floor)
                 if (!landedOnWindow) {
                     if (feetY >= floorY) {
                         this._y = floorY - this._displayH;
@@ -475,7 +498,6 @@ export const Gnomelet = GObject.registerClass(
 
             // --- Z-Ordering / Layering Logic ---
             if (landedOnWindow && !landedOnWindow.isDock) {
-                // If on a window, it must be in the same group to be ordered relative to it
                 let parent = this.actor.get_parent();
                 if (parent !== global.window_group) {
                     if (parent === Main.layoutManager.uiGroup) {
@@ -489,7 +511,6 @@ export const Gnomelet = GObject.registerClass(
                 global.window_group.set_child_above_sibling(this.actor, landedOnWindow.actor);
 
             } else {
-                // If on the floor, apply calculated Z-order preference (passed from Manager)
                 let parent = this.actor.get_parent();
 
                 if (!forceBackground) {
@@ -498,22 +519,17 @@ export const Gnomelet = GObject.registerClass(
                         Main.layoutManager.addChrome(this.actor);
                     }
 
-                    // Handle Dash-to-Dock Z-Order
-                    // Only reorder if the dock is actually a sibling in uiGroup
                     if (dockContainer && this.actor.get_parent() === Main.layoutManager.uiGroup &&
                         dockContainer.get_parent() === Main.layoutManager.uiGroup) {
 
                         let dockOrder = this._settings.get_boolean('dock-z-order');
                         if (dockOrder) {
-                            // In Front of Dash to Dock
                             Main.layoutManager.uiGroup.set_child_above_sibling(this.actor, dockContainer);
                         } else {
-                            // Default: Behind Dash to Dock
                             Main.layoutManager.uiGroup.set_child_below_sibling(this.actor, dockContainer);
                         }
                     }
                 } else {
-                    // Background Group
                     let bgGroup = Main.layoutManager._backgroundGroup;
                     if (bgGroup && parent !== bgGroup) {
                         if (parent === Main.layoutManager.uiGroup) {
@@ -528,18 +544,14 @@ export const Gnomelet = GObject.registerClass(
 
             // --- State Machine Transitions ---
             if (onGround) {
-                // On ground
                 if (this._state === State.FALLING || this._state === State.JUMPING) {
                     this._vy = 0;
                     this._pickNewAction();
                 }
             } else {
-                // Not on ground
                 if (this._state !== State.JUMPING) {
-                    // Logic: If we were walking and now we are not on ground, we are walking off an edge.
                     let jumped = false;
                     if (this._state === State.WALKING) {
-                        // "Jump for falling": Chance to jump when reaching the edge
                         if (Math.random() < 0.5) {
                             this._performJump();
                             jumped = true;
@@ -555,22 +567,18 @@ export const Gnomelet = GObject.registerClass(
             // --- AI Behavior ---
             if (this._state === State.WALKING) {
                 this._idleTimer = 0;
-                // Chance to stop walking
                 if (Math.random() < 0.02) {
                     this._state = State.IDLE;
                     this._vx = 0;
                     this._idleTimer = Math.random() * 60 + 20;
                 }
 
-                // Logic: "Jump only when useful" - Check for window overhead
                 let canJump = false;
 
-                // Let's recalculate precise feet position after collision adjustments
                 let currFeetY = this._y + this._displayH;
                 let currFeetX = this._x + this._displayW / 2;
 
                 for (let win of windows) {
-                    // Skip the window we are currently standing on
                     if (landedOnWindow && win === landedOnWindow) continue;
 
                     let rect = win.rect;
@@ -578,8 +586,6 @@ export const Gnomelet = GObject.registerClass(
                     let effectiveMinX = rect.x;
                     let effectiveMaxX = rect.x + rect.width;
 
-                    // Check if window is horizontally within range of our feet
-                    // We extend the "virtual" window size if we are approaching it from the side
                     if (currFeetX < rect.x && this.facingRight) {
                         effectiveMinX -= this._jumpReachX;
                     } else if (currFeetX > rect.x + rect.width && !this.facingRight) {
@@ -587,12 +593,8 @@ export const Gnomelet = GObject.registerClass(
                     }
 
                     if (currFeetX >= effectiveMinX && currFeetX <= effectiveMaxX) {
-                        // Check if window is vertically above us and reachable
-                        // Window top (rect.y) must be less than feet (currFeetY)
                         let dist = currFeetY - rect.y;
                         if (dist > 0 && dist <= this._maxJumpHeight) {
-                            // Only jump if we can actually fit on top of the target window 
-                            // without being blocked by the screen top (ceiling)
                             if (rect.y - this._displayH >= currentMonitor.y) {
                                 canJump = true;
                                 break;
@@ -601,7 +603,6 @@ export const Gnomelet = GObject.registerClass(
                     }
                 }
 
-                // If useful, chance to jump
                 if (canJump) {
                     if (Math.random() < 0.25) {
                         this._performJump();
@@ -634,7 +635,6 @@ export const Gnomelet = GObject.registerClass(
                 return focusedIsMaximized;
             }
 
-            // Disallow logic: Background if ANY visible window is maximized
             if (focusedIsMaximized) return true;
 
             let actors = global.window_group.get_children();
@@ -695,9 +695,8 @@ export const Gnomelet = GObject.registerClass(
          * Resets the character to the top.
          */
         _respawn() {
-            // Pick new type/identity on respawn
             if (this._resourceProvider) {
-                let res = this._resourceProvider(); // Pick random
+                let res = this._resourceProvider();
                 if (res) {
                     this._typeName = res.type;
                     this._frameImages = res.frames;
@@ -749,9 +748,19 @@ export const Gnomelet = GObject.registerClass(
             switch (this._state) {
                 case State.WALKING:
                     let walkFrames = [0, 1, 2, 3];
-                    let speed = 4; // Frame changes every 4 ticks
+                    let speed = 4;
                     let idx = Math.floor(this._animationTimer / speed) % walkFrames.length;
                     frameIndex = walkFrames[idx];
+                    break;
+                case State.CHASING:
+                    let chaseFrames = [0, 1, 2, 3];
+                    let chaseIdx = Math.floor(this._animationTimer / 3) % chaseFrames.length;
+                    frameIndex = chaseFrames[chaseIdx];
+                    break;
+                case State.FLOATING:
+                    let floatFrames = [0, 1, 2, 3];
+                    let floatIdx = Math.floor(this._animationTimer / 6) % floatFrames.length;
+                    frameIndex = floatFrames[floatIdx];
                     break;
                 case State.IDLE:
                     frameIndex = 4;
@@ -760,8 +769,27 @@ export const Gnomelet = GObject.registerClass(
                 case State.FALLING:
                     frameIndex = 5;
                     break;
+                case State.THROWING:
+                case State.SHOOTING:
+                    let throwFrames = [6, 7];
+                    let throwIdx = Math.floor(this._animationTimer / 6) % throwFrames.length;
+                    frameIndex = throwFrames[throwIdx];
+                    break;
+                case State.STUNNED:
+                    frameIndex = 6;
+                    break;
+                case State.DYING:
+                    frameIndex = 7;
+                    break;
+                case State.GLORY_KILL:
+                    let gloryFrames = [6, 7];
+                    let gloryIdx = Math.floor(this._animationTimer / 8) % gloryFrames.length;
+                    frameIndex = gloryFrames[gloryIdx];
+                    break;
+                case State.SPAWNING:
+                    frameIndex = 0;
+                    break;
                 case State.DRAGGING:
-                    // Cycle between two walking frames
                     let dragFrames = [1, 3];
                     if (this._frameImages[6] && this._frameImages[7]) {
                         dragFrames = [6, 7];
@@ -787,7 +815,6 @@ export const Gnomelet = GObject.registerClass(
                 this._icon.set_gicon(this._frameImages[frameIndex]);
             }
 
-            // Horizontal mirroring
             this._icon.set_pivot_point(0.5, 0.5);
             if (this.facingRight) {
                 this._icon.scale_x = 1;
