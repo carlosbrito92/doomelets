@@ -7,6 +7,9 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import { Gnomelet } from './gnomelet.js';
+import { Imp }        from './characters/imp.js';
+import { Cacodemon }  from './characters/cacodemon.js';
+import { DoomSlayer } from './characters/doom-slayer.js';
 import { isWindowMaximized, UPDATE_INTERVAL_MS } from './utils.js';
 
 /**
@@ -18,6 +21,7 @@ export const GnomeletManager = GObject.registerClass(
         _init(settings) {
             super._init();
             this._gnomelets = [];
+            this._projectiles = [];
             this._settings = settings;
             this._windows = [];
             this._timerId = 0;
@@ -339,7 +343,7 @@ export const GnomeletManager = GObject.registerClass(
                     if (!res) break;
                     // Bind resource provider
                     let provider = (t) => this._pickResource(t);
-                    this._gnomelets.push(new Gnomelet(res.type, res.frames, res.w, res.h, this._settings, provider));
+                    this._gnomelets.push(this._createCharacter(res.type, res.frames, res.w, res.h, provider));
                 }
             } else if (count < current) {
                 for (let i = 0; i < (current - count); i++) {
@@ -382,7 +386,7 @@ export const GnomeletManager = GObject.registerClass(
                 if (!instanceRes) instanceRes = this._pickResource(); // Fallback if somehow both failed (e.g. valid types empty)
                 if (!instanceRes) break;
 
-                let p = new Gnomelet(instanceRes.type, instanceRes.frames, instanceRes.w, instanceRes.h, this._settings, provider);
+                let p = this._createCharacter(instanceRes.type, instanceRes.frames, instanceRes.w, instanceRes.h, provider);
                 if (stateToUse && stateToUse[i]) p.deserialize(stateToUse[i]);
                 this._gnomelets.push(p);
             }
@@ -390,6 +394,8 @@ export const GnomeletManager = GObject.registerClass(
 
         _destroyGnomelets() {
             for (let p of this._gnomelets) p.destroy();
+            this._gnomelets = [];
+            this._destroyProjectiles();
             this._gnomelets = [];
         }
 
@@ -590,7 +596,17 @@ export const GnomeletManager = GObject.registerClass(
                     this._windows.push(...dockWindows);
                 }
 
-                for (let p of this._gnomelets) p.update(this._windows, forceBackground, dockContainer);
+                for (let p of this._gnomelets) {
+                p.update(this._windows, forceBackground, dockContainer, this._gnomelets, this._projectiles);
+            }
+            this._updateProjectiles();
+            // Doom: remover entidades marcadas para destruição
+            if (this._gnomelets.some(g => g._markedForRemoval)) {
+                this._gnomelets = this._gnomelets.filter(g => {
+                    if (g._markedForRemoval) { g.destroy(); return false; }
+                    return true;
+                });
+            }
             } catch (e) {
                 console.error(e);
             }
@@ -619,4 +635,48 @@ export const GnomeletManager = GObject.registerClass(
                 this._spawnGnomelets(null);
             }
         }
-    });
+    }
+        /**
+         * Doom: Factory — instancia a subclasse correta pelo nome do tipo.
+         */
+        _createCharacter(type, frames, w, h, provider) {
+            const args = [type, frames, w, h, this._settings, provider];
+            const spawnCb = (x, y, vx, vy, dmg) => this._spawnProjectile(x, y, vx, vy, 'imp', dmg);
+            switch (type) {
+                case 'Imp':        return new Imp(...args, spawnCb);
+                case 'Cacodemon':  return new Cacodemon(...args);
+                case 'DoomSlayer': return new DoomSlayer(...args);
+                default:           return new Gnomelet(...args);
+            }
+        }
+
+        /**
+         * Doom: Cria um projétil e adiciona à lista gerenciada.
+         */
+        _spawnProjectile(x, y, vx, vy, owner, damage) {
+            // Projectile será implementado no Sprint 2
+            // Por ora, a assinatura já está disponível para o Imp chamar
+        }
+
+        /**
+         * Doom: Atualiza todos os projéteis ativos.
+         */
+        _updateProjectiles() {
+            if (this._projectiles.length === 0) return;
+            const targets = this._gnomelets.filter(g => g._typeName === 'DoomSlayer');
+            this._projectiles = this._projectiles.filter(p => {
+                p.update(targets);
+                if (!p.alive) { p.destroy(); return false; }
+                return true;
+            });
+        }
+
+        /**
+         * Doom: Destrói todos os projéteis ativos.
+         */
+        _destroyProjectiles() {
+            for (let p of this._projectiles) p.destroy();
+            this._projectiles = [];
+        }
+
+});
