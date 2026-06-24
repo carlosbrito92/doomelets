@@ -9,6 +9,11 @@ import {
     State,
     GRAVITY,
     WALK_SPEED,
+    IMP_WALK_SPEED,
+    IMP_CHASE_SPEED,
+    SLAYER_CHASE_SPEED,
+    FLOAT_AMPLITUDE,
+    FLOAT_FREQUENCY,
     isWindowMaximized,
     UPDATE_INTERVAL_MS
 } from './utils.js';
