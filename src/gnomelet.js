@@ -776,10 +776,10 @@ export const Gnomelet = GObject.registerClass(
                     frameIndex = throwFrames[throwIdx];
                     break;
                 case State.STUNNED:
-                    frameIndex = 6;
+                    frameIndex = this._frameImages[9] ? 9 : 6;   // 9.png (dano) é opcional
                     break;
                 case State.DYING:
-                    frameIndex = 7;
+                    frameIndex = this._frameImages[8] ? 8 : 7;   // 8.png (morte) é opcional
                     break;
                 case State.GLORY_KILL:
                     let gloryFrames = [6, 7];
