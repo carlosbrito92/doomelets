@@ -635,7 +635,6 @@ export const GnomeletManager = GObject.registerClass(
                 this._spawnGnomelets(null);
             }
         }
-    }
         /**
          * Doom: Factory — instancia a subclasse correta pelo nome do tipo.
          */
