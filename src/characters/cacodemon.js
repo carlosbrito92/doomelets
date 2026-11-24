@@ -14,8 +14,9 @@ import {
  */
 export const Cacodemon = GObject.registerClass(
     class Cacodemon extends Gnomelet {
-        _init(typeName, frameImages, frameWidth, frameHeight, settings, resourceProvider) {
+        _init(typeName, frameImages, frameWidth, frameHeight, settings, resourceProvider, spawnProjectileCb) {
             super._init(typeName, frameImages, frameWidth, frameHeight, settings, resourceProvider);
+            this._spawnProjectileCb = spawnProjectileCb ?? null;
 
             // --- Doom: Stats ---
             this._hp            = 5;
@@ -116,8 +117,14 @@ export const Cacodemon = GObject.registerClass(
                     this._state = State.SHOOTING;
                     this._shootDuration = this._shootDurationMax;
                     this._shootCooldown = this._shootCooldownMax;
-                    // Dano direto ao Slayer (sem projétil físico no Sprint 1)
-                    slayer.takeDamage(2);
+                    if (this._spawnProjectileCb) {
+                        const sx = this._x + this._displayW / 2, sy = this._y + this._displayH * 0.65;
+                        const tx = slayer._x + slayer._displayW / 2, ty = slayer._y + slayer._displayH / 2;
+                        const len = Math.hypot(tx - sx, ty - sy) || 1;
+                        this._spawnProjectileCb(sx, sy, (tx - sx) / len * 7, (ty - sy) / len * 7, 2);
+                    } else {
+                        slayer.takeDamage(2);
+                    }
                 }
             }
 

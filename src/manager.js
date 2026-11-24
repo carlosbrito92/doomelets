@@ -10,6 +10,7 @@ import { Gnomelet } from './gnomelet.js';
 import { Imp }        from './characters/imp.js';
 import { Cacodemon }  from './characters/cacodemon.js';
 import { DoomSlayer } from './characters/doom-slayer.js';
+import { Projectile } from './projectile.js';
 import { isWindowMaximized, UPDATE_INTERVAL_MS } from './utils.js';
 
 /**
@@ -640,11 +641,11 @@ export const GnomeletManager = GObject.registerClass(
          */
         _createCharacter(type, frames, w, h, provider) {
             const args = [type, frames, w, h, this._settings, provider];
-            const spawnCb = (x, y, vx, vy, dmg) => this._spawnProjectile(x, y, vx, vy, 'imp', dmg);
+            const cbFor = (owner) => (x, y, vx, vy, dmg) => this._spawnProjectile(x, y, vx, vy, owner, dmg);
             switch (type) {
-                case 'Imp':        return new Imp(...args, spawnCb);
-                case 'Cacodemon':  return new Cacodemon(...args);
-                case 'DoomSlayer': return new DoomSlayer(...args);
+                case 'Imp':        return new Imp(...args, cbFor('imp'));
+                case 'Cacodemon':  return new Cacodemon(...args, cbFor('caco'));
+                case 'DoomSlayer': return new DoomSlayer(...args, cbFor('slayer'));
                 default:           return new Gnomelet(...args);
             }
         }
@@ -653,8 +654,7 @@ export const GnomeletManager = GObject.registerClass(
          * Doom: Cria um projétil e adiciona à lista gerenciada.
          */
         _spawnProjectile(x, y, vx, vy, owner, damage) {
-            // Projectile será implementado no Sprint 2
-            // Por ora, a assinatura já está disponível para o Imp chamar
+            this._projectiles.push(new Projectile(x, y, vx, vy, owner, damage));
         }
 
         /**
@@ -662,9 +662,10 @@ export const GnomeletManager = GObject.registerClass(
          */
         _updateProjectiles() {
             if (this._projectiles.length === 0) return;
-            const targets = this._gnomelets.filter(g => g._typeName === 'DoomSlayer');
+            const slayers = this._gnomelets.filter(g => g._typeName === 'DoomSlayer');
+            const enemies = this._gnomelets.filter(g => g._typeName === 'Imp' || g._typeName === 'Cacodemon');
             this._projectiles = this._projectiles.filter(p => {
-                p.update(targets);
+                p.update(p.owner === 'slayer' ? enemies : slayers);
                 if (!p.alive) { p.destroy(); return false; }
                 return true;
             });
