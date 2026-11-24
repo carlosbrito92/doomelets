@@ -46,11 +46,12 @@ Want to add your own character? It's easy!
     *   **6.png - 7.png**: (Optional) Dragging animation frames. If missing, frames `1.png` and `3.png` are used.
     *   **8.png**: (Optional) Death frame. If missing, `7.png` is used.
     *   **9.png**: (Optional) Hurt/stunned frame. If missing, `6.png` is used.
+    *   **10.png / 11.png**: (Optional) Picked-up pose, alternated while the user drags the character (dangling sway). If missing, `6.png`/`7.png` (or the walk frames) are used.
 4.  Reload the extension or restart GNOME Shell. Your new character will appear in the settings dropdown!
 
 ## Doom Characters
 
-`DoomSlayer`, `Imp` and `Cacodemon` ship with 10 frames each (`0.png`-`9.png`, where `6.png`/`7.png` are the attack frames). They are rendered from the three.js rigs in `demo/` (`doomguy-rig.html`, `imp-rig.html`, `cacodemon-rig.html`); regenerate them with `python3 scripts/render_doom_sprites.py` (needs `playwright` and `pillow`).
+`DoomSlayer`, `Imp` and `Cacodemon` ship with 12 frames each (`0.png`-`11.png`, where `6.png`/`7.png` are the attack frames and `10.png`/`11.png` the picked-up pose). They are rendered from the three.js rigs in `demo/` (`doomguy-rig.html`, `imp-rig.html`, `cacodemon-rig.html`); regenerate them with `python3 scripts/render_doom_sprites.py` (needs `playwright` and `pillow`).
 
 ## Installation
 

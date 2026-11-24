@@ -118,7 +118,7 @@ export const GnomeletManager = GObject.registerClass(
                         };
 
                         let promises = [];
-                        for (let i = 0; i < 10; i++) promises.push(loadFrame(i));   // 8 e 9 (morte, dano) são opcionais
+                        for (let i = 0; i < 12; i++) promises.push(loadFrame(i));   // 8-11 (morte, dano, pego) são opcionais
 
                         let results = await Promise.all(promises);
                         for (let res of results) {

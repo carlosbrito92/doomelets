@@ -355,6 +355,11 @@ const ANIMS = {
     [0.3, Q({ root: [-22, 0, 8], jaw: [44, 0, 0], eye: [-10, 0, 0], lid: [34, 0, 0] }, { sq: -0.16, dz: -0.2 })],
     [1.0, Q({})],
   ]) },
+  held: { label: 'Pego (drag)', frames: 2, loop: true, fn: keyAnim([
+    [0.0, Q({ root: [8, 0, 10], jaw: [30, 0, 0], eye: [-6, 0, 0], lid: [30, 0, 0] }, { sq: -0.1 })],
+    [0.5, Q({ root: [8, 0, -10], jaw: [18, 0, 0], eye: [-6, 0, 0], lid: [34, 0, 0] }, { sq: -0.1 })],
+    [1.0, Q({ root: [8, 0, 10], jaw: [30, 0, 0], eye: [-6, 0, 0], lid: [30, 0, 0] }, { sq: -0.1 })],
+  ]) },
   death: { label: 'Morte', frames: 10, loop: false, fn: keyAnim([
     [0.00, Q({})],
     [0.20, Q({ root: [-18, 0, 6], jaw: [50, 0, 0], lid: [30, 0, 0] }, { sq: 0.14, lift: 0.1 })],

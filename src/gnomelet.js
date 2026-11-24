@@ -792,7 +792,9 @@ export const Gnomelet = GObject.registerClass(
                     break;
                 case State.DRAGGING:
                     let dragFrames = [1, 3];
-                    if (this._frameImages[6] && this._frameImages[7]) {
+                    if (this._frameImages[10] && this._frameImages[11]) {
+                        dragFrames = [10, 11];   // pego pela nuca (opcional)
+                    } else if (this._frameImages[6] && this._frameImages[7]) {
                         dragFrames = [6, 7];
                     }
                     let dragSpeed = 8;

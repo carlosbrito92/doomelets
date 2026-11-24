@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Renderiza os sprites 0..9.png do Doom Slayer, Imp e Cacodemon a partir dos rigs three.js em demo/.
+"""Renderiza os sprites 0..11.png do Doom Slayer, Imp e Cacodemon a partir dos rigs three.js em demo/.
 
 Requer: pip install playwright pillow && playwright install chromium
 Uso:    python3 scripts/render_doom_sprites.py [pasta_de_saida]   (padrão: src/images)
 
 Quadros (ver README): 0-3 andar/flutuar, 4 parado, 5 pulo/queda, 6-7 ataque (preparar/disparar),
-8 morte (opcional), 9 dano (opcional). Todos os quadros de um personagem têm o mesmo tamanho,
+8 morte, 9 dano, 10-11 pego/arrastado (todos opcionais). Todos os quadros de um personagem têm o mesmo tamanho,
 com o corpo centralizado (o jogo espelha o sprite pelo centro).
 """
 import base64, io, os, sys
@@ -21,13 +21,13 @@ WALK4 = [0, 2, 4, 6]
 CHARS = {
     'DoomSlayer': dict(page='doomguy-rig.html', yaw=60, pitch=8, frames=[
         *[('walk', i / 8) for i in WALK4], ('idle', 0.0), ('jumpUp', 0.55),
-        ('shoot', 0.30), ('shoot', 0.06), ('death', 1.0), ('hurt', 0.3)]),
+        ('shoot', 0.30), ('shoot', 0.06), ('death', 1.0), ('hurt', 0.3), ('held', 0.0), ('held', 0.5)]),
     'Imp': dict(page='imp-rig.html', yaw=60, pitch=8, frames=[
         *[('walk', i / 8) for i in WALK4], ('idle', 0.0), ('jumpUp', 0.55),
-        ('fireball', 0.30), ('fireball', 0.72), ('death', 1.0), ('hurt', 0.3)]),
+        ('fireball', 0.30), ('fireball', 0.72), ('death', 1.0), ('hurt', 0.3), ('held', 0.0), ('held', 0.5)]),
     'Cacodemon': dict(page='cacodemon-rig.html', yaw=25, pitch=8, frames=[
         *[('fly', i / 8) for i in WALK4], ('idle', 0.25), ('ascend', 0.5),
-        ('fireball', 0.30), ('fireball', 0.68), ('death', 1.0), ('hurt', 0.3)]),
+        ('fireball', 0.30), ('fireball', 0.68), ('death', 1.0), ('hurt', 0.3), ('held', 0.0), ('held', 0.5)]),
 }
 
 def main():
