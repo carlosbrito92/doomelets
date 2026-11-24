@@ -17,6 +17,8 @@ export const Imp = GObject.registerClass(
         _init(typeName, frameImages, frameWidth, frameHeight, settings, resourceProvider, spawnProjectileCb) {
             super._init(typeName, frameImages, frameWidth, frameHeight, settings, resourceProvider);
 
+            this._lockType = true;   // respawn mantém o tipo
+
             // --- Doom: Stats ---
             this._hp             = 3;
             this._maxHp          = 3;
@@ -27,7 +29,7 @@ export const Imp = GObject.registerClass(
             this._detectRange       = 400;  // px — distância para notar o Slayer
             this._throwRange        = 300;  // px — distância para lançar
             this._throwCooldown     = 0;
-            this._throwCooldownMax  = 120;  // ticks (~6s)
+            this._throwCooldownMax  = 70;   // ticks (~3.5s)
             this._throwDuration     = 0;
             this._throwDurationMax  = 20;   // ticks que fica no estado THROWING
             this._currentTarget     = null;
@@ -40,9 +42,6 @@ export const Imp = GObject.registerClass(
          * Substitui _pickNewAction() para adicionar lógica de perseguição e throw.
          */
         _pickNewAction() {
-            // Decrementar cooldown de throw
-            if (this._throwCooldown > 0) this._throwCooldown--;
-
             // Procurar Slayer entre as entidades (injetadas via update())
             const slayer = this._allEntities
                 ? this._allEntities.find(e => e._typeName === 'DoomSlayer')
@@ -63,6 +62,15 @@ export const Imp = GObject.registerClass(
                         this._throwDuration = this._throwDurationMax;
                         this._throwCooldown = this._throwCooldownMax;
                         this._vx = 0;
+                        return;
+                    }
+
+                    // Perto demais e sem munição: segura a posição um instante
+                    if (Math.abs(dx) < 150) {
+                        this._state = State.IDLE;
+                        this._vx = 0;
+                        this._idleTimer = 6;
+                        this._savedFacing = dx > 0;
                         return;
                     }
 
@@ -92,6 +100,10 @@ export const Imp = GObject.registerClass(
         update(windows, forceBackground, dockContainer, allEntities = [], projectiles = []) {
             // Salva referência para uso em _pickNewAction()
             this._allEntities = allEntities;
+            if (this._throwCooldown > 0) this._throwCooldown--;
+
+            // CHASING não tem lógica no Gnomelet base: reavalia o alvo a cada tick
+            if (this._state === State.CHASING) this._pickNewAction();
 
             // Gerenciar estado THROWING antes de delegar ao super
             if (this._state === State.THROWING) {

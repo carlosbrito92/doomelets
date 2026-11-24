@@ -388,7 +388,8 @@ export const GnomeletManager = GObject.registerClass(
                 if (!instanceRes) break;
 
                 let p = this._createCharacter(instanceRes.type, instanceRes.frames, instanceRes.w, instanceRes.h, provider);
-                if (stateToUse && stateToUse[i]) p.deserialize(stateToUse[i]);
+                // Só restaura estado se o tipo salvo ainda existe (evita herdar hp/estado de outra classe)
+                if (stateToUse && stateToUse[i] && stateToUse[i].type === instanceRes.type) p.deserialize(stateToUse[i]);
                 this._gnomelets.push(p);
             }
         }

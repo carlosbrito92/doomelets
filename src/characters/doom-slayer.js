@@ -18,6 +18,8 @@ export const DoomSlayer = GObject.registerClass(
         _init(typeName, frameImages, frameWidth, frameHeight, settings, resourceProvider, spawnProjectileCb) {
             super._init(typeName, frameImages, frameWidth, frameHeight, settings, resourceProvider);
 
+            this._lockType = true;   // respawn mantém o tipo
+
             // --- Doom: Stats ---
             this._hp            = 12;
             this._maxHp         = 12;
@@ -25,8 +27,8 @@ export const DoomSlayer = GObject.registerClass(
             this._deathDuration = 30;
 
             // --- Doom: IA ---
-            this._detectRange       = 700;  // px — distância para notar um inimigo
-            this._shootRange        = 450;  // px — distância para atirar
+            this._detectRange       = 900;  // px — distância para notar um inimigo
+            this._shootRange        = 650;  // px — distância para atirar
             this._gloryRange        = 80;   // px — distância para glory kill
             this._shootCooldown     = 0;
             this._shootCooldownMax  = 30;   // ticks (~1.5s)
@@ -61,6 +63,14 @@ export const DoomSlayer = GObject.registerClass(
             if (found) {
                 this._currentTarget = found.enemy;
                 const dx = (found.enemy._x + found.enemy._displayW / 2) - (this._x + this._displayW / 2);
+                if (Math.abs(dx) < 160 && found.enemy._state !== State.STUNNED) {
+                    // Distância boa de tiro: para e espera o cooldown
+                    this._state = State.IDLE;
+                    this._vx = 0;
+                    this._idleTimer = 4;
+                    this._savedFacing = dx > 0;
+                    return;
+                }
                 this._state = State.CHASING;
                 this._vx = (dx > 0 ? 1 : -1) * SLAYER_CHASE_SPEED;
                 return;
@@ -95,6 +105,9 @@ export const DoomSlayer = GObject.registerClass(
                 this.actor?.set_position(Math.floor(this._x), Math.floor(this._y));
                 return;
             }
+
+            // CHASING não tem lógica no Gnomelet base: reavalia o alvo a cada tick
+            if (this._state === State.CHASING) this._pickNewAction();
 
             // Só decide atacar quando está no chão agindo normalmente
             if (this._state === State.WALKING || this._state === State.CHASING || this._state === State.IDLE) {

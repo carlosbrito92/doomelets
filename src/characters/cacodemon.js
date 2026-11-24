@@ -18,6 +18,8 @@ export const Cacodemon = GObject.registerClass(
             super._init(typeName, frameImages, frameWidth, frameHeight, settings, resourceProvider);
             this._spawnProjectileCb = spawnProjectileCb ?? null;
 
+            this._lockType = true;   // respawn mantém o tipo
+
             // --- Doom: Stats ---
             this._hp            = 5;
             this._maxHp         = 5;
