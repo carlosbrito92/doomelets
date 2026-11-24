@@ -47,6 +47,7 @@ Want to add your own character? It's easy!
     *   **8.png**: (Optional) Death frame. If missing, `7.png` is used.
     *   **9.png**: (Optional) Hurt/stunned frame. If missing, `6.png` is used.
     *   **10.png / 11.png**: (Optional) Picked-up pose, alternated while the user drags the character (dangling sway). If missing, `6.png`/`7.png` (or the walk frames) are used.
+    *   **12.png / 13.png**: (Optional) Petting pose (Doom Slayer petting a nearby original character). If missing, `4.png` is used.
 4.  Reload the extension or restart GNOME Shell. Your new character will appear in the settings dropdown!
 
 ## Doom Characters

@@ -787,6 +787,13 @@ export const Gnomelet = GObject.registerClass(
                     let gloryIdx = Math.floor(this._animationTimer / 8) % gloryFrames.length;
                     frameIndex = gloryFrames[gloryIdx];
                     break;
+                case State.PETTING:
+                    if (this._frameImages[12] && this._frameImages[13]) {
+                        frameIndex = [12, 13][Math.floor(this._animationTimer / 6) % 2];   // 12-13: carinho (opcional)
+                    } else {
+                        frameIndex = 4;
+                    }
+                    break;
                 case State.SPAWNING:
                     frameIndex = 0;
                     break;

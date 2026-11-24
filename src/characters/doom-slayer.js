@@ -7,6 +7,11 @@ import {
 } from '../utils.js';
 
 const ENEMY_TYPES = ['Imp', 'Cacodemon'];
+const PET_RANGE_X = 90;      // px — distância horizontal para fazer carinho
+const PET_RANGE_Y = 70;      // px — diferença vertical máxima
+const PET_DURATION = 40;     // ticks (~2s)
+const PET_COOLDOWN = 160;    // ticks (~8s) entre carinhos
+const RESPAWN_INVULN = 40;   // ticks de invulnerabilidade após renascer
 
 /**
  * Doom Slayer — caça Imps e Cacodemons.
@@ -24,7 +29,7 @@ export const DoomSlayer = GObject.registerClass(
             this._hp            = 12;
             this._maxHp         = 12;
             this._stunDuration  = 6;
-            this._deathDuration = 30;
+            this._deathDuration = 10;   // renasce rápido: sempre há um Slayer em cena
 
             // --- Doom: IA ---
             this._detectRange       = 900;  // px — distância para notar um inimigo
@@ -37,6 +42,10 @@ export const DoomSlayer = GObject.registerClass(
             this._gloryDuration     = 0;
             this._gloryDurationMax  = 24;
             this._currentTarget     = null;
+            this._petCooldown       = 0;
+            this._petDuration       = 0;
+            this._petTarget         = null;
+            this._invuln            = 0;
 
             this._spawnProjectileCb = spawnProjectileCb ?? null;
         }
@@ -52,6 +61,29 @@ export const DoomSlayer = GObject.registerClass(
                 if (d < bestDist) { best = e; bestDist = d; }
             }
             return best && bestDist < this._detectRange ? { enemy: best, dist: bestDist } : null;
+        }
+
+        /** Personagem original (não-Doom) parado ou andando no chão por perto, ou null. */
+        _findCritter() {
+            const cx = this._x + this._displayW / 2, cy = this._y + this._displayH;
+            let best = null, bestDx = Infinity;
+            for (const e of this._allEntities ?? []) {
+                if (e === this || !e.actor || e._isDead || e._maxHp > 0) continue;   // só originais (hp 0)
+                if (e._state !== State.WALKING && e._state !== State.IDLE) continue;
+                const dx = Math.abs(e._x + e._displayW / 2 - cx), dy = Math.abs(e._y + e._displayH - cy);
+                if (dx < PET_RANGE_X && dy < PET_RANGE_Y && dx < bestDx) { best = e; bestDx = dx; }
+            }
+            return best;
+        }
+
+        takeDamage(amount) {
+            if (this._invuln > 0) return;
+            super.takeDamage(amount);
+        }
+
+        _onDeathComplete() {
+            super._onDeathComplete();
+            this._invuln = RESPAWN_INVULN;
         }
 
         _faceTarget(enemy) {
@@ -89,6 +121,22 @@ export const DoomSlayer = GObject.registerClass(
         update(windows, forceBackground, dockContainer, allEntities = [], projectiles = []) {
             this._allEntities = allEntities;
             if (this._shootCooldown > 0) this._shootCooldown--;
+            if (this._petCooldown > 0) this._petCooldown--;
+            if (this._invuln > 0) this._invuln--;
+
+            // Carinho em andamento: mantém o alvo parado até acabar
+            if (this._state === State.PETTING) {
+                const c = this._petTarget;
+                if (--this._petDuration <= 0 || !c || !c.actor || c._isDead || c._maxHp > 0 || this._findTarget()) {
+                    this._petTarget = null;
+                    this._pickNewAction();
+                } else {
+                    c._vx = 0; c._state = State.IDLE; c._idleTimer = Math.max(c._idleTimer, 3);
+                }
+                this._updateAnimation();
+                this.actor?.set_position(Math.floor(this._x), Math.floor(this._y));
+                return;
+            }
 
             // Glory kill em andamento: parado, sem física
             if (this._state === State.GLORY_KILL) {
@@ -131,6 +179,19 @@ export const DoomSlayer = GObject.registerClass(
                         this._shootCooldown = this._shootCooldownMax;
                         this._vx = 0;
                         this._fireShotgun(e);
+                        this._updateAnimation();
+                        return;
+                    }
+                } else if (this._petCooldown === 0) {
+                    const c = this._findCritter();
+                    if (c) {
+                        this._faceTarget(c);
+                        this._state = State.PETTING;
+                        this._petTarget = c;
+                        this._petDuration = PET_DURATION;
+                        this._petCooldown = PET_COOLDOWN;
+                        this._vx = 0;
+                        c._vx = 0; c._state = State.IDLE; c._idleTimer = PET_DURATION;
                         this._updateAnimation();
                         return;
                     }

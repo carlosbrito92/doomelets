@@ -24,6 +24,7 @@ export const State = {
     CHASING:    'CHASING',     // Perseguindo alvo
     SHOOTING:   'SHOOTING',    // Doom Slayer: animação de tiro
     GLORY_KILL: 'GLORY_KILL',  // Doom Slayer: execução corpo a corpo
+    PETTING:    'PETTING',     // Doom Slayer: fazendo carinho em um personagem original
     STUNNED:    'STUNNED',     // Atingido: pausa antes de morrer ou recuperar
     DYING:      'DYING',       // Animação de morte em andamento
     SPAWNING:   'SPAWNING',    // Fade-in de entrada na tela
