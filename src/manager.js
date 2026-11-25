@@ -15,6 +15,8 @@ import { isWindowMaximized, UPDATE_INTERVAL_MS } from './utils.js';
 
 const SLAYER = 'DoomSlayer';   // sempre exatamente um em cena quando selecionado
 const DEMONS = ['Imp', 'Cacodemon'];
+const DEMON_RESPAWN_MIN = 100;   // ticks (~5s)
+const DEMON_RESPAWN_MAX = 200;   // ticks (~10s)
 
 /**
  * GnomeletManager Class
@@ -25,6 +27,7 @@ export const GnomeletManager = GObject.registerClass(
         _init(settings) {
             super._init();
             this._gnomelets = [];
+            this._demonQueue = [];   // demônios mortos esperando para voltar
             this._projectiles = [];
             this._settings = settings;
             this._windows = [];
@@ -120,8 +123,14 @@ export const GnomeletManager = GObject.registerClass(
                             });
                         };
 
+                        // animations.json (opcional) descreve animações com quantos quadros quiser
+                        const animations = await this._loadAnimations(typeDir);
+                        const total = animations
+                            ? 1 + Math.max(...Object.values(animations).flatMap(a => a.frames))
+                            : 10;
+
                         let promises = [];
-                        for (let i = 0; i < 14; i++) promises.push(loadFrame(i));   // 8-13 (morte, dano, pego, carinho) são opcionais
+                        for (let i = 0; i < total; i++) promises.push(loadFrame(i));   // 8 e 9 (morte, dano) são opcionais
 
                         let results = await Promise.all(promises);
                         for (let res of results) {
@@ -137,6 +146,8 @@ export const GnomeletManager = GObject.registerClass(
                             }
                         }
 
+                        frames.animations = animations;   // acompanha os quadros em qualquer troca de tipo
+
                         if (anySuccess && frameW > 0 && frameH > 0) {
                             this._resources[typeName] = { frames, w: frameW, h: frameH };
                             loadedSomething = true;
@@ -151,6 +162,21 @@ export const GnomeletManager = GObject.registerClass(
 
             if (hardReset) this._hardReset();
             else this._spawnGnomelets(null);
+        }
+
+        /** Lê o manifesto de animações da pasta do personagem; null se não existir. */
+        _loadAnimations(typeDir) {
+            return new Promise((resolve) => {
+                typeDir.get_child('animations.json').load_contents_async(this._cancellable, (file, res) => {
+                    try {
+                        const [, contents] = file.load_contents_finish(res);
+                        resolve(JSON.parse(new TextDecoder('utf-8').decode(contents)));
+                    } catch (e) {
+                        if (!e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND)) console.warn(`animations.json: ${e}`);
+                        resolve(null);
+                    }
+                });
+            });
         }
 
         get isVisualizationEnabled() {
@@ -349,7 +375,8 @@ export const GnomeletManager = GObject.registerClass(
         _updateCount() {
             if (this._isPaused) return;
             let count = this._settings.get_int('gnomelet-count');
-            let current = this._gnomelets.length;
+            // Demônios aguardando para voltar também ocupam vaga
+            let current = this._gnomelets.length + this._demonQueue.length;
 
             // Garante o Slayer único (ele ocupa uma das vagas da contagem)
             if (count > 0 && this._wantsSlayer() && !this._gnomelets.some(g => g._typeName === SLAYER)) {
@@ -365,6 +392,7 @@ export const GnomeletManager = GObject.registerClass(
                 }
             } else if (count < current) {
                 for (let i = 0; i < (current - count); i++) {
+                    if (this._demonQueue.pop()) continue;
                     // O Slayer é o último a sair (só quando a contagem chega a 0)
                     let idx = this._gnomelets.findLastIndex(g => g._typeName !== SLAYER);
                     if (idx < 0) idx = this._gnomelets.length - 1;
@@ -410,16 +438,36 @@ export const GnomeletManager = GObject.registerClass(
             }
         }
 
+        /** Demônio morto volta depois de um intervalo aleatório. */
+        _queueDemon(type) {
+            const ticks = DEMON_RESPAWN_MIN +
+                Math.floor(Math.random() * (DEMON_RESPAWN_MAX - DEMON_RESPAWN_MIN + 1));
+            this._demonQueue.push({ type, ticks });
+        }
+
+        /** Faz entrar pela borda da tela os demônios cujo tempo de espera acabou. */
+        _updateDemonQueue() {
+            this._demonQueue = this._demonQueue.filter(entry => {
+                if (--entry.ticks > 0) return true;
+                const res = this._pickResource(entry.type);
+                if (res) this._addCharacter(res).enterFromEdge(Math.random() < 0.5);
+                return false;
+            });
+        }
+
         _addCharacter(res, saved = null) {
             // Shared provider reference
             let provider = (t, originalsOnly) => this._pickResource(t, originalsOnly);
             let p = this._createCharacter(res.type, res.frames, res.w, res.h, provider);
             // Só restaura estado se o tipo salvo ainda existe (evita herdar hp/estado de outra classe)
-            if (saved && saved.type === res.type) p.deserialize(saved);
+            // (quem foi salvo morrendo recomeça do zero, em vez de voltar como "zumbi" com hp 0)
+            if (saved && saved.type === res.type && !(p._maxHp > 0 && saved.hp <= 0)) p.deserialize(saved);
             this._gnomelets.push(p);
+            return p;
         }
 
         _destroyGnomelets() {
+            this._demonQueue = [];
             for (let p of this._gnomelets) p.destroy();
             this._gnomelets = [];
             this._destroyProjectiles();
@@ -623,6 +671,7 @@ export const GnomeletManager = GObject.registerClass(
                     this._windows.push(...dockWindows);
                 }
 
+                this._updateDemonQueue();
                 for (let p of this._gnomelets) {
                 p.update(this._windows, forceBackground, dockContainer, this._gnomelets, this._projectiles);
             }
@@ -630,7 +679,11 @@ export const GnomeletManager = GObject.registerClass(
             // Doom: remover entidades marcadas para destruição
             if (this._gnomelets.some(g => g._markedForRemoval)) {
                 this._gnomelets = this._gnomelets.filter(g => {
-                    if (g._markedForRemoval) { g.destroy(); return false; }
+                    if (g._markedForRemoval) {
+                        if (DEMONS.includes(g._typeName)) this._queueDemon(g._typeName);
+                        g.destroy();
+                        return false;
+                    }
                     return true;
                 });
             }

@@ -740,11 +740,63 @@ export const Gnomelet = GObject.registerClass(
             this._vx = dir * WALK_SPEED * 2;
         }
 
+        /** Nome da animação do manifesto correspondente ao estado atual. */
+        _animationName() {
+            switch (this._state) {
+                case State.CHASING:    return 'run';
+                case State.FLOATING:   return 'float';
+                case State.IDLE:       return 'idle';
+                case State.JUMPING:    return 'jump';
+                case State.FALLING:    return 'fall';
+                case State.THROWING:
+                case State.SHOOTING:   return 'attack';
+                case State.STUNNED:    return 'hurt';
+                case State.DYING:      return 'death';
+                case State.GLORY_KILL: return 'glory';
+                case State.PETTING:    return 'pet';
+                case State.DRAGGING:   return 'held';
+                default:               return 'walk';
+            }
+        }
+
+        /** Entra andando por uma das bordas do monitor principal. */
+        enterFromEdge(fromLeft) {
+            const monitor = Main.layoutManager.primaryMonitor;
+            this._x = fromLeft
+                ? monitor.x - this._displayW * 0.7
+                : monitor.x + monitor.width - this._displayW * 0.3;
+            this._y = monitor.y + monitor.height - this._displayH;
+            this._vx = (fromLeft ? 1 : -1) * WALK_SPEED;
+            this._vy = 0;
+            this._savedFacing = fromLeft;
+            this._state = State.WALKING;
+            this.actor?.set_position(Math.floor(this._x), Math.floor(this._y));
+        }
+
         /**
          * Calculates the correct frame based on state and time.
          */
         _updateAnimation() {
             this._animationTimer++;
+
+            const name = this._animationName();
+            if (name !== this._animName) {
+                this._animName = name;
+                this._animClock = 0;
+            } else {
+                this._animClock++;
+            }
+
+            // Com manifesto (animations.json) cada animação tem seus próprios quadros e ritmo
+            const anim = this._frameImages?.animations?.[name];
+            if (anim) {
+                let i = Math.floor(this._animClock / anim.ticks);
+                i = anim.loop ? i % anim.frames.length : Math.min(i, anim.frames.length - 1);
+                this.setFrame(anim.frames[i]);
+                return;
+            }
+
+            // Sem manifesto: contrato original de quadros numerados
             let frameIndex = 0;
             switch (this._state) {
                 case State.WALKING:
@@ -788,20 +840,14 @@ export const Gnomelet = GObject.registerClass(
                     frameIndex = gloryFrames[gloryIdx];
                     break;
                 case State.PETTING:
-                    if (this._frameImages[12] && this._frameImages[13]) {
-                        frameIndex = [12, 13][Math.floor(this._animationTimer / 6) % 2];   // 12-13: carinho (opcional)
-                    } else {
-                        frameIndex = 4;
-                    }
+                    frameIndex = 4;
                     break;
                 case State.SPAWNING:
                     frameIndex = 0;
                     break;
                 case State.DRAGGING:
                     let dragFrames = [1, 3];
-                    if (this._frameImages[10] && this._frameImages[11]) {
-                        dragFrames = [10, 11];   // pego pela nuca (opcional)
-                    } else if (this._frameImages[6] && this._frameImages[7]) {
+                    if (this._frameImages[6] && this._frameImages[7]) {
                         dragFrames = [6, 7];
                     }
                     let dragSpeed = 8;

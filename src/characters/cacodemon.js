@@ -84,6 +84,8 @@ export const Cacodemon = GObject.registerClass(
             // Gerenciar SHOOTING
             if (this._state === State.SHOOTING) {
                 this._shootDuration--;
+                // A bola de fogo sai no meio da animação, quando a boca está aberta
+                if (this._shootDuration === Math.floor(this._shootDurationMax / 2)) this._fire(allEntities);
                 if (this._shootDuration <= 0) this._state = State.FLOATING;
                 this._updateAnimation();
                 return;
@@ -119,14 +121,6 @@ export const Cacodemon = GObject.registerClass(
                     this._state = State.SHOOTING;
                     this._shootDuration = this._shootDurationMax;
                     this._shootCooldown = this._shootCooldownMax;
-                    if (this._spawnProjectileCb) {
-                        const sx = this._x + this._displayW / 2, sy = this._y + this._displayH * 0.65;
-                        const tx = slayer._x + slayer._displayW / 2, ty = slayer._y + slayer._displayH / 2;
-                        const len = Math.hypot(tx - sx, ty - sy) || 1;
-                        this._spawnProjectileCb(sx, sy, (tx - sx) / len * 7, (ty - sy) / len * 7, 2);
-                    } else {
-                        slayer.takeDamage(2);
-                    }
                 }
             }
 
@@ -139,6 +133,26 @@ export const Cacodemon = GObject.registerClass(
 
             this._updateAnimation();
             this.actor.set_position(Math.floor(this._x), Math.floor(this._y));
+        }
+
+        _fire(allEntities) {
+            const slayer = allEntities.find(e => e._typeName === 'DoomSlayer');
+            if (!slayer || !slayer.actor) return;
+            if (!this._spawnProjectileCb) {
+                slayer.takeDamage(2);
+                return;
+            }
+            const sx = this._x + this._displayW / 2, sy = this._y + this._displayH * 0.65;
+            const tx = slayer._x + slayer._displayW / 2, ty = slayer._y + slayer._displayH / 2;
+            const len = Math.hypot(tx - sx, ty - sy) || 1;
+            this._spawnProjectileCb(sx, sy, (tx - sx) / len * 7, (ty - sy) / len * 7, 2);
+        }
+
+        /** Entra flutuando por uma das bordas (a altura é definida pelo update). */
+        enterFromEdge(fromLeft) {
+            this._x = fromLeft ? 0 : global.stage.width - this._displayW;
+            this._floatSpeedX = (fromLeft ? 1 : -1) * 1.5;
+            this._state = State.FLOATING;
         }
 
         /**

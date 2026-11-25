@@ -7,6 +7,7 @@ import {
 } from '../utils.js';
 
 const ENEMY_TYPES = ['Imp', 'Cacodemon'];
+const IDLE_VARIANTS = ['reload', 'look', null];   // null = só respirar
 const PET_RANGE_X = 90;      // px — distância horizontal para fazer carinho
 const PET_RANGE_Y = 70;      // px — diferença vertical máxima
 const PET_DURATION = 40;     // ticks (~2s)
@@ -29,7 +30,7 @@ export const DoomSlayer = GObject.registerClass(
             this._hp            = 12;
             this._maxHp         = 12;
             this._stunDuration  = 6;
-            this._deathDuration = 10;   // renasce rápido: sempre há um Slayer em cena
+            this._deathDuration = 18;   // ~0,9s: mostra a queda e renasce rápido
 
             // --- Doom: IA ---
             this._detectRange       = 900;  // px — distância para notar um inimigo
@@ -76,6 +77,33 @@ export const DoomSlayer = GObject.registerClass(
             return best;
         }
 
+        /** Parado por um tempo: às vezes recarrega a espingarda ou olha para os lados. */
+        _animationName() {
+            const name = super._animationName();
+            if (this._state !== State.IDLE) {
+                this._wasIdle = false;
+                this._idleVariant = null;
+                return name;
+            }
+            if (!this._wasIdle) {
+                this._wasIdle = true;
+                this._idleVariant = null;
+                // Pausas curtas são de combate (esperando o cooldown): ficam só respirando
+                if (this._idleTimer >= 20) {
+                    const choice = IDLE_VARIANTS[Math.floor(Math.random() * IDLE_VARIANTS.length)];
+                    const anim = this._frameImages?.animations?.[choice];
+                    if (anim) {
+                        this._idleVariant = choice;
+                        this._idleVariantTicks = Math.ceil(anim.frames.length * anim.ticks);
+                        this._idleTimer = Math.max(this._idleTimer, this._idleVariantTicks + 20);
+                    }
+                }
+            }
+            if (this._idleVariant && this._idleVariantTicks-- > 0) return this._idleVariant;
+            this._idleVariant = null;
+            return name;
+        }
+
         takeDamage(amount) {
             if (this._invuln > 0) return;
             super.takeDamage(amount);
@@ -91,6 +119,7 @@ export const DoomSlayer = GObject.registerClass(
         }
 
         _pickNewAction() {
+            this._wasIdle = false;   // um novo período parado pode sortear outra variação
             const found = this._findTarget();
             if (found) {
                 this._currentTarget = found.enemy;

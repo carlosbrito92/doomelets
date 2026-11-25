@@ -46,13 +46,21 @@ Want to add your own character? It's easy!
     *   **6.png - 7.png**: (Optional) Dragging animation frames. If missing, frames `1.png` and `3.png` are used.
     *   **8.png**: (Optional) Death frame. If missing, `7.png` is used.
     *   **9.png**: (Optional) Hurt/stunned frame. If missing, `6.png` is used.
-    *   **10.png / 11.png**: (Optional) Picked-up pose, alternated while the user drags the character (dangling sway). If missing, `6.png`/`7.png` (or the walk frames) are used.
-    *   **12.png / 13.png**: (Optional) Petting pose (Doom Slayer petting a nearby original character). If missing, `4.png` is used.
 4.  Reload the extension or restart GNOME Shell. Your new character will appear in the settings dropdown!
 
 ## Doom Characters
 
-`DoomSlayer`, `Imp` and `Cacodemon` ship with 12 frames each (`0.png`-`11.png`, where `6.png`/`7.png` are the attack frames and `10.png`/`11.png` the picked-up pose). They are rendered from the three.js rigs in `demo/` (`doomguy-rig.html`, `imp-rig.html`, `cacodemon-rig.html`); regenerate them with `python3 scripts/render_doom_sprites.py` (needs `playwright` and `pillow`).
+`DoomSlayer`, `Imp` and `Cacodemon` use an `animations.json` manifest for smoother animation (86, 52 and 45 frames). They are rendered from the three.js rigs in `demo/` (`doomguy-rig.html`, `imp-rig.html`, `cacodemon-rig.html`); regenerate them with `python3 scripts/render_doom_sprites.py` (needs `playwright` and `pillow`).
+
+**Optional `animations.json`:** a character folder may describe its animations with any number of frames, instead of the fixed numbering above. Each entry lists PNG numbers, `ticks` (50 ms units) per frame, and whether it loops:
+
+```json
+{ "walk": { "frames": [0, 1, 2, 3, 4, 5, 6, 7], "ticks": 2, "loop": true } }
+```
+
+Names: `walk`, `run`, `float`, `idle`, `jump`, `fall`, `attack`, `glory`, `hurt`, `death`, `held` (dragged by the user), `pet`, plus the Doom Slayer idle variations `reload` and `look`. If you provide a manifest, include every state the character can reach.
+
+Dead Imps and Cacodemons come back from the screen edge after 5-10 seconds.
 
 When `DoomSlayer` is selected there is always exactly one on screen (it counts toward the character count). The remaining slots are filled with the other selected types.
 

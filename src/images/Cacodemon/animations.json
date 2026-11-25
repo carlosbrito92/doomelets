@@ -1,0 +1,109 @@
+{
+ "walk": {
+  "frames": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "ticks": 3,
+  "loop": true
+ },
+ "float": {
+  "frames": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "ticks": 3,
+  "loop": true
+ },
+ "idle": {
+  "frames": [
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15
+  ],
+  "ticks": 4,
+  "loop": true
+ },
+ "jump": {
+  "frames": [
+   16,
+   17,
+   18
+  ],
+  "ticks": 3,
+  "loop": false
+ },
+ "fall": {
+  "frames": [
+   19,
+   20,
+   21
+  ],
+  "ticks": 3,
+  "loop": false
+ },
+ "attack": {
+  "frames": [
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28,
+   29
+  ],
+  "ticks": 1.5,
+  "loop": false
+ },
+ "hurt": {
+  "frames": [
+   30,
+   31,
+   32
+  ],
+  "ticks": 2,
+  "loop": false
+ },
+ "death": {
+  "frames": [
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39,
+   40
+  ],
+  "ticks": 3,
+  "loop": false
+ },
+ "held": {
+  "frames": [
+   41,
+   42,
+   43,
+   44
+  ],
+  "ticks": 4,
+  "loop": true
+ }
+}
