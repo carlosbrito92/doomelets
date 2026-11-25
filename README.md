@@ -54,6 +54,8 @@ Want to add your own character? It's easy!
 
 `DoomSlayer`, `Imp` and `Cacodemon` ship with 12 frames each (`0.png`-`11.png`, where `6.png`/`7.png` are the attack frames and `10.png`/`11.png` the picked-up pose). They are rendered from the three.js rigs in `demo/` (`doomguy-rig.html`, `imp-rig.html`, `cacodemon-rig.html`); regenerate them with `python3 scripts/render_doom_sprites.py` (needs `playwright` and `pillow`).
 
+When `DoomSlayer` is selected there is always exactly one on screen (it counts toward the character count). The remaining slots are filled with the other selected types.
+
 ## Installation
 
 1.  Download the extension.

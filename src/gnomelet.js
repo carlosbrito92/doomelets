@@ -697,7 +697,7 @@ export const Gnomelet = GObject.registerClass(
         _respawn() {
             if (this._resourceProvider) {
                 // Personagens Doom têm classe própria: respawn nunca troca o tipo
-                let res = this._resourceProvider(this._lockType ? this._typeName : undefined);
+                let res = this._resourceProvider(this._lockType ? this._typeName : null, !this._lockType);
                 if (res) {
                     this._typeName = res.type;
                     this._frameImages = res.frames;

@@ -13,6 +13,9 @@ import { DoomSlayer } from './characters/doom-slayer.js';
 import { Projectile } from './projectile.js';
 import { isWindowMaximized, UPDATE_INTERVAL_MS } from './utils.js';
 
+const SLAYER = 'DoomSlayer';   // sempre exatamente um em cena quando selecionado
+const DEMONS = ['Imp', 'Cacodemon'];
+
 /**
  * GnomeletManager Class
  * Orchestrates the lifecycle of all characters and global resources.
@@ -307,10 +310,19 @@ export const GnomeletManager = GObject.registerClass(
             this._spawnGnomelets(null);
         }
 
+        /** O Doom Slayer está selecionado e com sprites carregados? */
+        _wantsSlayer() {
+            return Boolean(this._resources[SLAYER]) &&
+                this._settings.get_strv('gnomelet-type').includes(SLAYER);
+        }
+
         /**
-         * Adds or removes characters based on settings count.
+         * Resolves a resource by name, or picks a random one among the selected types.
+         * The random pick never returns the Doom Slayer: there is exactly one, spawned explicitly.
+         * `originalsOnly` also excludes the demons (an original must not turn into a Doom type
+         * on respawn, since it would keep the base class).
          */
-        _pickResource(typeName = null) {
+        _pickResource(typeName = null, originalsOnly = false) {
             if (typeName && this._resources[typeName]) {
                 let res = this._resources[typeName];
                 return { type: typeName, frames: res.frames, w: res.w, h: res.h };
@@ -320,7 +332,8 @@ export const GnomeletManager = GObject.registerClass(
             let selectedTypes = this._settings.get_strv('gnomelet-type');
             if (!selectedTypes || selectedTypes.length === 0) selectedTypes = ['Santa'];
             // Filter those that are actually loaded
-            let valid = selectedTypes.filter(t => this._resources[t]);
+            let valid = selectedTypes.filter(t => t !== SLAYER && this._resources[t] &&
+                !(originalsOnly && DEMONS.includes(t)));
 
             // If none of selected are loaded just return null.
             if (valid.length === 0) return null;
@@ -338,17 +351,24 @@ export const GnomeletManager = GObject.registerClass(
             let count = this._settings.get_int('gnomelet-count');
             let current = this._gnomelets.length;
 
+            // Garante o Slayer único (ele ocupa uma das vagas da contagem)
+            if (count > 0 && this._wantsSlayer() && !this._gnomelets.some(g => g._typeName === SLAYER)) {
+                this._addCharacter(this._pickResource(SLAYER));
+                current++;
+            }
+
             if (count > current) {
                 for (let i = 0; i < (count - current); i++) {
                     let res = this._pickResource();
                     if (!res) break;
-                    // Bind resource provider
-                    let provider = (t) => this._pickResource(t);
-                    this._gnomelets.push(this._createCharacter(res.type, res.frames, res.w, res.h, provider));
+                    this._addCharacter(res);
                 }
             } else if (count < current) {
                 for (let i = 0; i < (current - count); i++) {
-                    let p = this._gnomelets.pop();
+                    // O Slayer é o último a sair (só quando a contagem chega a 0)
+                    let idx = this._gnomelets.findLastIndex(g => g._typeName !== SLAYER);
+                    if (idx < 0) idx = this._gnomelets.length - 1;
+                    let [p] = this._gnomelets.splice(idx, 1);
                     p.destroy();
                 }
             }
@@ -361,37 +381,42 @@ export const GnomeletManager = GObject.registerClass(
             let count = this._settings.get_int('gnomelet-count');
 
             // Ensure we have at least one resource loaded
-            let res = this._pickResource();
-            if (!res) {
+            if (!this._pickResource() && !this._wantsSlayer()) {
                 this._loadResourcesAndSpawn(false);
                 return;
             }
 
             if (this._gnomelets.length > 0) this._destroyGnomelets();
 
-            let stateToUse = savedState || this._pendingState;
+            let stateToUse = savedState || this._pendingState || [];
             this._pendingState = null;
 
-            // Shared provider reference
-            let provider = (t) => this._pickResource(t);
+            if (count > 0 && this._wantsSlayer()) {
+                this._addCharacter(this._pickResource(SLAYER), stateToUse.find(d => d?.type === SLAYER));
+            }
 
-            for (let i = 0; i < count; i++) {
+            // Estados salvos dos demais (Slayers extras de versões antigas são descartados)
+            let others = stateToUse.filter(d => d && d.type !== SLAYER);
+
+            for (let i = 0; this._gnomelets.length < count; i++) {
                 // Priority: Saved Type -> Random
-                let specificType = null;
-                if (stateToUse && stateToUse[i] && stateToUse[i].type) {
-                    specificType = stateToUse[i].type;
-                }
-
-                let instanceRes = this._pickResource(specificType);
+                let saved = others[i];
+                let instanceRes = this._pickResource(saved?.type);
 
                 if (!instanceRes) instanceRes = this._pickResource(); // Fallback if somehow both failed (e.g. valid types empty)
                 if (!instanceRes) break;
 
-                let p = this._createCharacter(instanceRes.type, instanceRes.frames, instanceRes.w, instanceRes.h, provider);
-                // Só restaura estado se o tipo salvo ainda existe (evita herdar hp/estado de outra classe)
-                if (stateToUse && stateToUse[i] && stateToUse[i].type === instanceRes.type) p.deserialize(stateToUse[i]);
-                this._gnomelets.push(p);
+                this._addCharacter(instanceRes, saved);
             }
+        }
+
+        _addCharacter(res, saved = null) {
+            // Shared provider reference
+            let provider = (t, originalsOnly) => this._pickResource(t, originalsOnly);
+            let p = this._createCharacter(res.type, res.frames, res.w, res.h, provider);
+            // Só restaura estado se o tipo salvo ainda existe (evita herdar hp/estado de outra classe)
+            if (saved && saved.type === res.type) p.deserialize(saved);
+            this._gnomelets.push(p);
         }
 
         _destroyGnomelets() {
