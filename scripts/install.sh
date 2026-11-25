@@ -1,52 +1,45 @@
 #!/bin/bash
+# Installs Doomelets for the current user.
+# With --zip, only builds the package (see pack.sh).
+set -euo pipefail
 
-# Configuration
-UUID="gnomelets@mcast.gnomext.com"
-INSTALL_DIR="$HOME/.local/share/gnome-shell/extensions/$UUID"
+UUID="doomelets@carlosbrito92.github.com"
+INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$UUID"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 SRC_DIR="$PROJECT_ROOT/src"
 
-FILES_TO_INSTALL="extension.js prefs.js metadata.json schemas images manager.js gnomelet.js indicator.js utils.js"
-ZIP_MODE=false
+FILES_TO_INSTALL=(extension.js prefs.js metadata.json manager.js gnomelet.js
+    indicator.js utils.js projectile.js characters schemas images)
 
-# Check for --zip argument
-if [[ "$1" == "--zip" ]]; then
-    ZIP_MODE=true
+if [[ "${1:-}" == "--zip" ]]; then
+    exec "$SCRIPT_DIR/pack.sh"
+elif [[ $# -gt 0 ]]; then
+    echo "Usage: $0 [--zip]" >&2
+    exit 1
 fi
 
-echo "🚧 Building and Installing Gnomelets Extension..."
+echo "🚧 Installing Doomelets..."
 
-# 1. Compile Schemas
 echo "⚙️ Compiling schemas..."
-glib-compile-schemas "$SRC_DIR/schemas/"
+glib-compile-schemas --strict "$SRC_DIR/schemas/"
 
-# Move to source directory to simplify file operations
-cd "$SRC_DIR" || exit
-
-if [ "$ZIP_MODE" = true ]; then
-    # Create temp directory
-    mkdir -p "$PROJECT_ROOT/temp"
-    ZIP_FILE="$PROJECT_ROOT/temp/${UUID}.zip"
-
-    # Create zip archive
-    echo "🤐 Creating zip package: $ZIP_FILE"
-    rm -f "$ZIP_FILE"
-    zip -r "$ZIP_FILE" $FILES_TO_INSTALL
-
-    echo "✅ Package created successfully!"
-else
-    # 2. Create directory if it doesn't exist
-    if [ ! -d "$INSTALL_DIR" ]; then
-        echo "📂 Creating install directory: $INSTALL_DIR"
-        mkdir -p "$INSTALL_DIR"
+if [[ -L "$INSTALL_DIR" ]]; then
+    # A development symlink must not be copied over: it may point back to the sources.
+    if [[ "$(readlink -f "$INSTALL_DIR")" != "$(readlink -f "$SRC_DIR")" ]]; then
+        echo "❌ $INSTALL_DIR is a symlink to another folder. Remove it and run again." >&2
+        exit 1
     fi
-
-    # 3. Copy files
+    echo "🔗 $INSTALL_DIR already links to the sources; nothing to copy."
+else
     echo "📦 Copying files to $INSTALL_DIR..."
-    cp -r $FILES_TO_INSTALL "$INSTALL_DIR"
-
-    # 4. Success message
-    echo "✅ Installation complete!"
-    echo "🔄 Please restart GNOME Shell (Alt+F2, then 'r' on X11, or Log Out/In on Wayland) to see changes."
+    mkdir -p "$INSTALL_DIR"
+    # Existing files are overwritten; extra files (such as custom characters) are kept.
+    for file in "${FILES_TO_INSTALL[@]}"; do
+        cp -r "$SRC_DIR/$file" "$INSTALL_DIR/"
+    done
 fi
+
+echo "✅ Installation complete!"
+echo "🔄 Restart GNOME Shell (log out and in on Wayland; Alt+F2, then 'r' on X11),"
+echo "   then run: gnome-extensions enable $UUID"

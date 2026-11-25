@@ -1,58 +1,130 @@
-# Gnomelets 🎅
+# Doomelets 👹
 
-Brighten up your GNOME desktop with **Gnomelets**! This extension brings small, animated 2D characters to life, letting them roam freely across your screen. They walk, jump, and even balance on top of your open windows.
+Doom-themed desktop pets for GNOME Shell. Imps run across your windows, Cacodemons float above them, and the Doom Slayer hunts them all down.
 
+## About the project
 
-Watch as they fall from the top of the screen, land on your active windows, and explore your desktop environment with charming pixel-art animations.
+Doomelets is a fork of [**Gnomelets**](https://github.com/ihpled/gnomelets) by [ihpled](https://github.com/ihpled), an extension that lets small animated 2D characters walk, jump and balance on top of your open windows. The fork starts from upstream commit [`d710927`](https://github.com/ihpled/gnomelets/commit/d710927) (2026-05-01).
 
-https://github.com/user-attachments/assets/2a6e47ec-c063-4d65-87ba-e7559144d641
+The desktop pet engine (physics, window and dock interaction, multi-monitor support, drag and drop, preferences and state persistence) comes from Gnomelets. Credit for that foundation belongs to the original project and its contributors.
 
-## Features
+### What Doomelets adds
 
-*   **Custom Characters**: Easily add your own pixel-art characters.
-*   **Physics-based Movement**: Gnomelets obey gravity, falling naturally and landing on solid surfaces.
-*   **Window Interaction**: They detect open windows and can walk along their title bars and top edges.
-*   **Pixel-Art Animations**: Smooth idle, walking, jumping, and falling animations.
-*   **State Persistence**: Gnomelets remember where they were even after you restart the shell or disable/enable the extension.
-*   **Multi-Monitor Support**: They can travel and spawn across all your connected screens.
-*   **Smart AI Behavior**: Gnomelets employ intelligent jumping mechanics, detecting edges to perform daring leaps and predicting reachable windows to climb upwards dynamically.
-*   **Top Bar Controls**: A convenient menu in the top bar lets you instantly re-spawn all gnomelets or toggle their visibility on/off without opening settings.
-*   **Interactive Drag & Drop with Momentum**: Pick up gnomelets with your mouse and toss them! They now support physics-based throwing—release them while moving the mouse to fling them across the screen.
-*   **Dash to Dock (Ubuntu Dock) & Dash to Panel Support**: Gnomelets can now recognize, land on, and explore both Dash to Dock (Ubuntu Dock) and Dash to Panel if they are present on your screen!
+* **Three Doom characters:** the Doom Slayer, the Imp and the Cacodemon, each with its own class and AI.
+* **Combat:** hit points, projectiles, hurt and death states, and glory kills.
+* **Interaction with the original characters:** the Doom Slayer stops to pet them.
+* **Smoother animation:** an optional `animations.json` manifest allows any number of frames per animation.
+* **New animations:** a "held" pose while a Doom character is dragged, and idle variations for the Doom Slayer.
+* **Sprite pipeline:** three.js rigs and a script that renders them to PNG frames.
+* **Its own extension identity:** UUID `doomelets@carlosbrito92.github.com` and settings schema `org.gnome.shell.extensions.doomelets`.
+
+The original characters (Kitten, Mouse, Puppy, Santa, Squirrel and Tux) are still included.
+
+## Doom characters
+
+| Character | Hit points | Behaviour |
+|---|---|---|
+| **Doom Slayer** | 12 | Chases the nearest demon and fires a three-pellet shotgun. Executes a stunned demon within reach with a glory kill. |
+| **Imp** | 3 | Runs on the floor and on windows, approaches the Slayer and throws fireballs (1 damage). |
+| **Cacodemon** | 5 | Floats in the upper part of the primary monitor and spits fireballs (2 damage) when the Slayer is close. |
+
+* When `DoomSlayer` is selected, there is **always exactly one** on screen. It counts toward the character count, and the remaining slots are filled with the other selected types.
+* If the Slayer dies, it respawns after about one second and is briefly invulnerable.
+* Dead Imps and Cacodemons come back from the screen edge after 5 to 10 seconds, as long as their type is still selected.
+* When no demon is in range, the Slayer pets original characters that pass nearby. Demons ignore them, and the original characters cannot be damaged.
+* While standing still, the Slayer sometimes reloads the shotgun or looks around.
+
+## Features inherited from Gnomelets
+
+* **Physics-based movement:** characters obey gravity and land on solid surfaces.
+* **Window interaction:** they detect open windows and walk along their title bars and top edges.
+* **Smart jumping:** they detect edges, leap, and climb to reachable windows.
+* **Multi-monitor support:** characters can travel and spawn across all connected screens.
+* **Drag and drop with momentum:** pick a character up and toss it. Enable **Allow Interaction** first.
+* **Top bar menu:** respawn all characters or toggle their visibility.
+* **State persistence:** characters are restored after the extension is disabled and enabled again, or the shell restarts.
+* **Dash to Dock (Ubuntu Dock) and Dash to Panel support:** characters can land on and explore the dock or panel.
+
+## Installation
+
+### With the install script
+
+```bash
+git clone https://github.com/carlosbrito92/doomelets.git
+cd doomelets
+./scripts/install.sh
+```
+
+The script compiles the settings schema and copies the extension to your user extensions folder. If that folder is already a symlink to this repository's `src/`, it only compiles the schema. `./scripts/pack.sh` (or `./scripts/install.sh --zip`) creates `temp/doomelets@carlosbrito92.github.com.zip`, which can be installed with `gnome-extensions install`. It needs `zip`.
+
+After installing, restart GNOME Shell and enable the extension as described below.
+
+### Manually, with a symlink
+
+```bash
+git clone https://github.com/carlosbrito92/doomelets.git
+cd doomelets
+glib-compile-schemas src/schemas
+mkdir -p ~/.local/share/gnome-shell/extensions
+ln -s "$PWD/src" ~/.local/share/gnome-shell/extensions/doomelets@carlosbrito92.github.com
+```
+
+Use `cp -r src <destination>` instead of `ln -s` if you prefer an independent copy. Check first that the destination does not already exist.
+
+Restart GNOME Shell so it finds the extension (log out and back in on Wayland; press `Alt+F2`, type `r` and press Enter on X11). Then enable it:
+
+```bash
+gnome-extensions enable doomelets@carlosbrito92.github.com
+```
+
+Open the extension preferences and select `DoomSlayer`, `Imp` and `Cacodemon`. The default selection is `Santa`.
+
+The metadata declares support for GNOME Shell 45 to 50.
+
+### Updating
+
+After pulling new code (and copying it again, if you did not use a symlink), **restart GNOME Shell** as described above. Disabling and enabling the extension is not enough, because the running shell keeps the previously loaded JavaScript modules in memory.
+
+### Settings from earlier Doomelets versions
+
+Earlier versions stored settings under the Gnomelets path, and the saved state in `~/.cache/gnomelets-state.json`. To copy your settings to the new location (this overwrites the Doomelets settings already there):
+
+```bash
+dconf dump /org/gnome/shell/extensions/gnomelets/ | dconf load /org/gnome/shell/extensions/doomelets/
+```
+
+If you also use Gnomelets, those old settings may be its own, so check them before copying. The saved state only holds character positions and does not need to be migrated.
 
 ## Configuration
 
-You can customize your experience via the extension settings:
+* **Character selection:** choose one or more characters. The list includes every folder in the `images` directory.
+* **Number of characters:** how many are on screen at once.
+* **Size:** the character height in pixels.
+* **In Front of Maximized:** **Allow** keeps characters in front. **Partial** hides them behind a maximized or full-screen window when it is focused. **Disallow** keeps them behind any visible maximized or full-screen window.
+* **Dock Support:** Dash to Dock (Ubuntu Dock), Dash to Panel, or None.
+* **In Front of Dock:** draw characters in front of or behind the dock or panel.
+* **Allow Interaction:** enable dragging characters with the mouse. Off by default.
+* **Jump Power:** the vertical strength of jumps.
+* **Spawn Offset from Top:** the vertical position where characters spawn.
+* **Show Menu Indicator:** show or hide the top bar menu.
+* **Reset State:** respawn all characters.
 
-*   **Character Selection**: Select one or more characters (e.g., Kitten, Santa Claus, etc.) from the list. If multiple are selected, they will appear randomly! The list automatically updates with any new folders found in the `images` directory.
-*   **Population Control**: Decide how many gnomelets you want roaming your screen at once.
-*   **Scale**: Adjust the size of the characters to fit your screen resolution or preference.
-*   **In Front of Maximized**: Choose whether gnomelets walk in front of your windows or behind them. Use **Partial** or **Disallow** for a "distraction-free" experience: Partial intelligently hides gnomelets only when a maximized (or full-screen) window is focused, while Disallow keeps them hidden behind maximized/full-screen windows.
-*   **Dock Support**: Explicitly select "Dash to Dock (Ubuntu Dock)", "Dash to Panel", or "None" to optimize interaction.
-*   **Allows Interaction**: Now you can enable/disable the ability to drag and drop gnomelets with your mouse!
-*   **Jump Power**: Configure the vertical jump strength to make gnomelets hop higher or lower.
-*   **Spawn Offset from Top**: Customize the vertical offset from the top of the screen where gnomelets spawn.
+## Adding custom characters
 
-## Adding Custom Characters
+1. Open the extension's `images` folder (`~/.local/share/gnome-shell/extensions/doomelets@carlosbrito92.github.com/images`).
+2. Create a folder with your character's name (for example, `Robot`).
+3. Add the PNG animation frames:
+    * **0.png to 3.png:** walking.
+    * **4.png:** idle.
+    * **5.png:** jumping and falling.
+    * **6.png and 7.png** (optional): dragging. If missing, `1.png` and `3.png` are used.
+    * **8.png** (optional): death. If missing, `7.png` is used.
+    * **9.png** (optional): hurt or stunned. If missing, `6.png` is used.
+4. Restart GNOME Shell. The new character appears in the preferences.
 
-Want to add your own character? It's easy!
+### Optional `animations.json`
 
-1.  Navigate to the extension's `images` folder (usually in `~/.local/share/gnome-shell/extensions/gnomelets@.../images`).
-2.  Create a new folder with your character's name (e.g., `Robot`).
-3.  Add the PNG animation frames inside that folder:
-    *   **0.png - 3.png**: Walking animation frames.
-    *   **4.png**: Idle frame.
-    *   **5.png**: Jumping/Falling frame.
-    *   **6.png - 7.png**: (Optional) Dragging animation frames. If missing, frames `1.png` and `3.png` are used.
-    *   **8.png**: (Optional) Death frame. If missing, `7.png` is used.
-    *   **9.png**: (Optional) Hurt/stunned frame. If missing, `6.png` is used.
-4.  Reload the extension or restart GNOME Shell. Your new character will appear in the settings dropdown!
-
-## Doom Characters
-
-`DoomSlayer`, `Imp` and `Cacodemon` use an `animations.json` manifest for smoother animation (86, 52 and 45 frames). They are rendered from the three.js rigs in `demo/` (`doomguy-rig.html`, `imp-rig.html`, `cacodemon-rig.html`); regenerate them with `python3 scripts/render_doom_sprites.py` (needs `playwright` and `pillow`).
-
-**Optional `animations.json`:** a character folder may describe its animations with any number of frames, instead of the fixed numbering above. Each entry lists PNG numbers, `ticks` (50 ms units) per frame, and whether it loops:
+Instead of the fixed numbering above, a character folder may describe its animations with any number of frames. Each entry lists PNG numbers, the `ticks` (units of 50 ms) per frame, and whether the animation loops:
 
 ```json
 { "walk": { "frames": [0, 1, 2, 3, 4, 5, 6, 7], "ticks": 2, "loop": true } }
@@ -60,16 +132,32 @@ Want to add your own character? It's easy!
 
 Names: `walk`, `run`, `float`, `idle`, `jump`, `fall`, `attack`, `glory`, `hurt`, `death`, `held` (dragged by the user), `pet`, plus the Doom Slayer idle variations `reload` and `look`. If you provide a manifest, include every state the character can reach.
 
-Dead Imps and Cacodemons come back from the screen edge after 5-10 seconds.
+## Development
 
-When `DoomSlayer` is selected there is always exactly one on screen (it counts toward the character count). The remaining slots are filled with the other selected types.
+| Path | Contents |
+|---|---|
+| `src/` | The extension. `manager.js` handles spawning, `gnomelet.js` the base character and `projectile.js` the projectiles. |
+| `src/characters/` | The Doom Slayer, Imp and Cacodemon classes. |
+| `src/images/` | One folder of frames per character. |
+| `demo/` | three.js rigs for the Doom characters. |
+| `scripts/render_doom_sprites.py` | Renders the rigs to PNG frames and writes `animations.json`. |
 
-## Installation
+To regenerate the Doom sprites (needs the Python packages `playwright` and `pillow`, plus a Playwright browser):
 
-1.  Download the extension.
-2.  Install it via `gnome-extensions install` or copy the folder to `~/.local/share/gnome-shell/extensions/`.
-3.  Enable it using the Extensions app or `gnome-extensions enable`.
-4.  Open the settings to choose your favorite Gnomelet!
+```bash
+python3 scripts/render_doom_sprites.py
+```
 
----
-*Created with ❤️ for the GNOME community.*
+> **Testing in a nested or headless shell:** run it under `dbus-run-session`, with separate `XDG_CACHE_HOME`, `XDG_CONFIG_HOME` and `XDG_DATA_HOME` directories and `GSETTINGS_BACKEND=keyfile`. Otherwise the test can change your real desktop session, settings or saved state.
+
+### Known limitations
+
+* Some labels in the preferences and the top bar menu still say "Gnomelets".
+
+## License
+
+Doomelets is distributed under the GNU General Public License v3.0, as found in [LICENSE](LICENSE).
+
+## Disclaimer
+
+Doomelets is an unofficial, non-commercial fan project. It is not affiliated with or endorsed by id Software, Bethesda Softworks or ZeniMax Media. DOOM and its characters are the property of their respective owners.

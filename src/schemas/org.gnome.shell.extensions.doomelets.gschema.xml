@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<schemalist gettext-domain="gnomelets">
-  <schema id="org.gnome.shell.extensions.doomelets" path="/org/gnome/shell/extensions/gnomelets/">
+<schemalist gettext-domain="doomelets">
+  <schema id="org.gnome.shell.extensions.doomelets" path="/org/gnome/shell/extensions/doomelets/">
     <key name="floor-z-order" type="s">
       <choices>
         <choice value="allow"/>

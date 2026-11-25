@@ -1,36 +1,25 @@
 #!/bin/bash
+# Builds temp/<uuid>.zip, installable with `gnome-extensions install`.
+set -euo pipefail
 
+UUID="doomelets@carlosbrito92.github.com"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 SRC_DIR="$PROJECT_ROOT/src"
-ZIP_NAME="$PROJECT_ROOT/temp/gnomelets.zip"
+ZIP_FILE="$PROJECT_ROOT/temp/$UUID.zip"
 
-# Create temp directory if it doesn't exist
 mkdir -p "$PROJECT_ROOT/temp"
+rm -f "$ZIP_FILE"
 
-# Remove existing zip if it exists
-if [ -f "$ZIP_NAME" ]; then
-    rm "$ZIP_NAME"
-fi
+echo "⚙️ Compiling schemas..."
+glib-compile-schemas --strict "$SRC_DIR/schemas/"
 
 echo "📦 Packaging from $SRC_DIR..."
+cd "$SRC_DIR"
+zip -qr "$ZIP_FILE" extension.js prefs.js metadata.json manager.js gnomelet.js \
+    indicator.js utils.js projectile.js characters schemas images
 
-# Zip the extension files from src
-# -r: recurse into directories
-cd "$SRC_DIR" || exit
-zip -r "$ZIP_NAME" extension.js \
-    metadata.json \
-    prefs.js \
-    schemas/org.gnome.shell.extensions.gnomelets.gschema.xml \
-    images/ \
-    manager.js \
-    gnomelet.js \
-    indicator.js \
-    utils.js
+cd "$PROJECT_ROOT"
+zip -q "$ZIP_FILE" README.md LICENSE
 
-# Add README.md from root
-echo "📄 Adding README.md..."
-cd "$PROJECT_ROOT" || exit
-zip -g "$ZIP_NAME" README.md
-
-echo "✅ Created $ZIP_NAME"
+echo "✅ Created $ZIP_FILE"

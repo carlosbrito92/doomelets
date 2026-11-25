@@ -36,7 +36,7 @@ export const GnomeletManager = GObject.registerClass(
 
             // Resource cache: { [type: string]: { frames: GIcon[], w: int, h: int } }
             this._resources = {};
-            this._cacheFile = GLib.get_user_cache_dir() + '/gnomelets-state.json';
+            this._cacheFile = GLib.get_user_cache_dir() + '/doomelets-state.json';
             this._pendingState = null;
             this._isPaused = !this._settings.get_boolean('is-enabled');
         }
