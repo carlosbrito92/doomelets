@@ -97,32 +97,13 @@ If you also use Gnomelets, those old settings may be its own, so check them befo
 
 ## KDE Plasma version (KWin script)
 
-The `kwin-port` branch also contains a port for **KDE Plasma 6 on Wayland**, in `kwin/`. It is a KWin declarative script (QML). The character logic (physics, AI, combat, animation) is a port of `src/` to plain ES modules in `kwin/contents/code/`, and `kwin/contents/ui/main.qml` takes the place of GNOME Shell: it draws everything in one transparent overlay that does not take clicks, reads window positions from KWin, and handles dragging, settings and shortcuts. The sprites are shared with the GNOME version (`src/images`).
+The `kwin-port` branch also runs on **KDE Plasma 6 (Wayland)** as a KWin script, in `kwin/`. It uses the same characters, AI and sprites, and adds a settings window with game speed, demon respawn time and health per Doom character.
 
 ```bash
-./scripts/kwin.sh install     # build, install with kpackagetool6 and enable
-./scripts/kwin.sh uninstall   # disable and remove
-./scripts/kwin.sh dev         # load a fresh build into the running KWin, without installing
-./scripts/kwin.sh stop-dev    # unload the dev build
-./scripts/kwin.sh logs        # follow the script's messages
+./scripts/kwin.sh install     # then open "Doomelets Settings" from the app menu (or Meta+Ctrl+S)
 ```
 
-Settings are in **System Settings → Window Management → KWin Scripts → Doomelets** (configure button). Changes apply within about two seconds. The default selection is the Doom Slayer, the Imp and the Cacodemon.
-
-| Shortcut | Action |
-|---|---|
-| `Meta+Ctrl+D` | Show or hide the characters |
-| `Meta+Ctrl+R` | Respawn all characters |
-
-You can change them in **System Settings → Keyboard → Shortcuts → KWin**.
-
-Differences from the GNOME version:
-
-* **Layering:** GNOME can place a character between two windows. KWin scripts cannot, so all characters are drawn in a single overlay above the windows. A character standing on a window is hidden while it is behind another window that overlaps it.
-* **Panels instead of docks:** characters walk on Plasma panels (option **Walk on Plasma panels**). Dash to Dock and Dash to Panel do not apply.
-* **No saved state:** KWin scripts cannot write files, so characters start fresh after KWin restarts or the script is reloaded.
-* **No top bar menu:** use the shortcuts above.
-* **Custom characters:** add the folder under `src/images` and run `./scripts/kwin.sh install` again. The script generates the sprite manifest (`sprites.mjs`), because QML cannot list folders.
+See [KDE_PLASMA.md](KDE_PLASMA.md) for installation, settings, shortcuts, differences from the GNOME version and development notes.
 
 ## Configuration
 
@@ -168,7 +149,7 @@ Names: `walk`, `run`, `float`, `idle`, `jump`, `fall`, `attack`, `glory`, `hurt`
 | `src/` | The extension. `manager.js` handles spawning, `gnomelet.js` the base character and `projectile.js` the projectiles. |
 | `src/characters/` | The Doom Slayer, Imp and Cacodemon classes. |
 | `src/images/` | One folder of frames per character (shared with the KWin version). |
-| `kwin/` | The KDE Plasma port: `contents/code/` has the game logic as ES modules, `contents/ui/main.qml` the KWin front end. |
+| `kwin/` | The KDE Plasma port (see [KDE_PLASMA.md](KDE_PLASMA.md)). |
 | `scripts/kwin.sh` | Builds, installs and hot-loads the KWin version. |
 | `demo/` | three.js rigs for the Doom characters. |
 | `scripts/render_doom_sprites.py` | Renders the rigs to PNG frames and writes `animations.json`. |

@@ -51,6 +51,12 @@ export class Cacodemon extends Gnomelet {
     update(windows, forceBackground, dockContainer, allEntities = [], projectiles = []) {
         if (!this.actor) return;
 
+        // Sendo arrastado: só anima (o main.qml move o personagem junto com o cursor)
+        if (this._state === State.DRAGGING) {
+            this._updateAnimation();
+            return;
+        }
+
         // Guards herdados de estado de combate
         if (this._isDead) {
             this._deathTimer--;
@@ -97,6 +103,7 @@ export class Cacodemon extends Gnomelet {
         }
 
         this._floatTimer++;
+        if (this._dropOffsetY) this._dropOffsetY *= 0.92;   // desce/sobe suave até a âncora
         if (this._shootCooldown > 0) this._shootCooldown--;
 
         // Movimento horizontal com bounce nas bordas
@@ -108,7 +115,8 @@ export class Cacodemon extends Gnomelet {
         // Movimento vertical senoidal — ancorado no terço superior do monitor
         const monitor = platform.primaryMonitor();
         const anchorY  = monitor.y + monitor.height * 0.25;
-        this._y = anchorY + Math.sin(this._floatTimer * FLOAT_FREQUENCY) * FLOAT_AMPLITUDE;
+        this._y = anchorY + Math.sin(this._floatTimer * FLOAT_FREQUENCY) * FLOAT_AMPLITUDE +
+            (this._dropOffsetY || 0);
 
         // IA: detectar Slayer e disparar
         const slayer = allEntities.find(e => e._typeName === 'DoomSlayer');
@@ -128,6 +136,17 @@ export class Cacodemon extends Gnomelet {
         this._surface = null;
 
         this._updateAnimation();
+    }
+
+    /** Solto pelo usuário: sai flutuando do ponto onde caiu (sem gravidade nem arremesso). */
+    endDrag() {
+        if (this._state !== State.DRAGGING) return;
+        this._state = State.FLOATING;
+        this._vx = 0;
+        this._vy = 0;
+        const monitor = platform.primaryMonitor();
+        const anchorY = monitor.y + monitor.height * 0.25;
+        this._dropOffsetY = this._y - (anchorY + Math.sin(this._floatTimer * FLOAT_FREQUENCY) * FLOAT_AMPLITUDE);
     }
 
     _fire(allEntities) {

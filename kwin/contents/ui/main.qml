@@ -49,10 +49,17 @@ Item {
             "gnomelet-scale": Math.max(16, Math.min(512, readInt("Scale", 64))),
             "jump-power": Math.max(1, readInt("JumpPower", 20)),
             "spawn-offset": readInt("SpawnOffset", 0),
-            "allow-interaction": readBool("AllowInteraction", false),
+            "allow-interaction": readBool("AllowInteraction", true),
             "walk-on-panels": readBool("WalkOnPanels", true),
             "floor-z-order": floorModes[readInt("FloorZOrder", 0)] || "allow",
             "gnomelet-type": types,
+            "game-speed": Math.max(25, Math.min(300, readInt("GameSpeed", 100))),
+            // Segundos → ticks de 50 ms (o mínimo nunca passa do máximo)
+            "demon-respawn-min": Math.min(readInt("RespawnMin", 5), readInt("RespawnMax", 10)) * 20,
+            "demon-respawn-max": Math.max(readInt("RespawnMin", 5), readInt("RespawnMax", 10)) * 20,
+            "health-DoomSlayer": Math.max(1, readInt("SlayerHealth", 12)),
+            "health-Imp": Math.max(1, readInt("ImpHealth", 3)),
+            "health-Cacodemon": Math.max(1, readInt("CacodemonHealth", 5)),
         };
     }
 
@@ -267,7 +274,8 @@ Item {
 
     Timer {
         id: tickTimer
-        interval: Utils.UPDATE_INTERVAL_MS
+        // Velocidade do jogo: 100 % = 50 ms por tick, como no GNOME
+        interval: Math.round(Utils.UPDATE_INTERVAL_MS * 100 / (root.cfg["game-speed"] || 100))
         repeat: true
         onTriggered: {
             if (!root.manager) return;
@@ -329,6 +337,7 @@ Item {
 
     Component.onCompleted: {
         cfg = readCfg();
+        console.warn("Doomelets: started with", JSON.stringify(cfg));
         installPlatform();
         placeOverlay();
         overlay.show();

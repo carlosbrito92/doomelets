@@ -1,7 +1,8 @@
 #!/bin/bash
 # Builds, installs and runs the KDE Plasma (KWin) version of Doomelets.
 #
-#   ./scripts/kwin.sh install    build, install with kpackagetool6 and enable it (default)
+#   ./scripts/kwin.sh install    build, install with kpackagetool6, enable it and add the
+#                                "Doomelets Settings" launcher (default)
 #   ./scripts/kwin.sh uninstall  disable and remove it
 #   ./scripts/kwin.sh dev        load a fresh build into the running KWin without installing
 #   ./scripts/kwin.sh stop-dev   unload the dev build
@@ -12,6 +13,8 @@
 set -euo pipefail
 
 ID="doomelets"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+LAUNCHER="doomelets-settings.desktop"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BUILD_ROOT="$PROJECT_ROOT/temp"
@@ -21,18 +24,31 @@ kwin_call() {   # kwin_call <object path> <method> [args...]
     dbus-send --session --print-reply --dest=org.kde.KWin "$path" "$method" "$@"
 }
 
-# build <dest dir>: assembles the KWin package there
+# build <dest dir>: assembles the KWin package there.
+#
+# KWin keeps compiled QML and JS modules cached in memory by file URL until it restarts, and an
+# installed package always lives at the same path. So the code and sprites go into a folder named
+# after the build (contents/ui/<build>/), and the fixed entry point contents/ui/main.qml
+# (kwin/entry.qml) loads the folder named by the "Build" key that install writes to kwinrc.
+# Sets BUILD_NAME and BUILD_MAIN (the real main QML file, which dev mode loads directly).
 build() {
     local dest="$1"
+    BUILD_NAME="build-$(date +%s%N)"
+    local root="$dest/contents/ui/$BUILD_NAME"
     rm -rf "$dest"
-    mkdir -p "$dest"
-    cp -r "$PROJECT_ROOT/kwin/metadata.json" "$PROJECT_ROOT/kwin/contents" "$dest/"
-    mkdir -p "$dest/contents/images"
+    mkdir -p "$root/ui" "$root/images"
+    cp "$PROJECT_ROOT/kwin/metadata.json" "$dest/"
+    cp -r "$PROJECT_ROOT/kwin/contents/config" "$dest/contents/"
+    cp "$PROJECT_ROOT/kwin/contents/ui/config.ui" "$dest/contents/ui/"
+    cp "$PROJECT_ROOT/kwin/entry.qml" "$dest/contents/ui/main.qml"
+    cp -r "$PROJECT_ROOT/kwin/contents/code" "$root/"
+    cp "$PROJECT_ROOT/kwin/contents/ui/main.qml" "$root/ui/"
     for dir in "$PROJECT_ROOT"/src/images/*/; do
-        cp -r "$dir" "$dest/contents/images/"
+        cp -r "$dir" "$root/images/"
     done
+    BUILD_MAIN="$root/ui/main.qml"
     # QML cannot list directories or read JSON from disk, so the sprite manifest is generated
-    python3 -I - "$PROJECT_ROOT/src/images" "$dest/contents/code/sprites.mjs" <<'EOF'
+    python3 -I - "$PROJECT_ROOT/src/images" "$root/code/sprites.mjs" <<'EOF'
 import json, struct, sys
 from pathlib import Path
 
@@ -70,23 +86,33 @@ case "${1:-install}" in
             kpackagetool6 --type KWin/Script --install "$BUILD_ROOT/kwin-build/$ID"
         fi
         kwriteconfig6 --file kwinrc --group Plugins --key "${ID}Enabled" true
+        kwriteconfig6 --file kwinrc --group "Script-$ID" --key Build "$BUILD_NAME"
+        kwin_call /KWin org.kde.KWin.reconfigure >/dev/null              # rereads kwinrc
         kwin_call /Scripting org.kde.kwin.Scripting.start >/dev/null   # loads the enabled scripts
-        echo "✅ Installed and enabled. Configure it in System Settings → Window Management → KWin Scripts."
+        # "Doomelets Settings" in the app menu, plus its global shortcut (kglobalaccel reads X-KDE-Shortcuts)
+        for dir in applications kglobalaccel; do
+            mkdir -p "$DATA_HOME/$dir"
+            cp "$PROJECT_ROOT/kwin/$LAUNCHER" "$DATA_HOME/$dir/$LAUNCHER"
+        done
+        kbuildsycoca6 >/dev/null 2>&1 || true
+        echo "✅ Installed and enabled. Open \"Doomelets Settings\" from the app menu (or Meta+Ctrl+S) to configure it."
         ;;
     uninstall)
         kwriteconfig6 --file kwinrc --group Plugins --key "${ID}Enabled" false
         kwin_call /Scripting org.kde.kwin.Scripting.unloadScript "string:$ID" >/dev/null || true
         kpackagetool6 --type KWin/Script --remove "$ID" || true
+        kwriteconfig6 --file kwinrc --group "Script-$ID" --key Build --delete
+        rm -f "$DATA_HOME/applications/$LAUNCHER" "$DATA_HOME/kglobalaccel/$LAUNCHER"
+        kbuildsycoca6 >/dev/null 2>&1 || true
         echo "🗑️  Removed."
         ;;
     dev)
-        # Qt caches directory listings per path, so every dev load gets a new folder
-        rm -rf "$BUILD_ROOT"/kwin-dev-*
-        dest="$BUILD_ROOT/kwin-dev-$(date +%s)"
-        build "$dest"
+        # Every build gets a new folder name (see build), so KWin always compiles the current code
+        rm -rf "$BUILD_ROOT/kwin-dev"
+        build "$BUILD_ROOT/kwin-dev"
         kwin_call /Scripting org.kde.kwin.Scripting.unloadScript "string:$ID-dev" >/dev/null || true
         num=$(kwin_call /Scripting org.kde.kwin.Scripting.loadDeclarativeScript \
-            "string:$dest/contents/ui/main.qml" "string:$ID-dev" | awk '/int32/ {print $2}')
+            "string:$BUILD_MAIN" "string:$ID-dev" | awk '/int32/ {print $2}')
         if [[ -z "$num" || "$num" -lt 0 ]]; then
             echo "❌ KWin refused to load the script." >&2
             exit 1
@@ -102,7 +128,7 @@ case "${1:-install}" in
         journalctl --user -f -o cat _COMM=kwin_wayland | grep --line-buffered -iE "doomelets|qml|\.mjs"
         ;;
     *)
-        sed -n '2,11p' "$0" >&2
+        sed -n '2,12p' "$0" >&2
         exit 1
         ;;
 esac

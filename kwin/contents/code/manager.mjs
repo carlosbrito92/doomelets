@@ -15,8 +15,6 @@ import { Projectile } from './projectile.mjs';
 
 const SLAYER = 'DoomSlayer';   // sempre exatamente um em cena quando selecionado
 const DEMONS = ['Imp', 'Cacodemon'];
-const DEMON_RESPAWN_MIN = 100;   // ticks (~5s)
-const DEMON_RESPAWN_MAX = 200;   // ticks (~10s)
 
 export class GnomeletManager {
     constructor(settings, host) {
@@ -78,6 +76,7 @@ export class GnomeletManager {
         else if (key === 'gnomelet-type') this._loadResourcesAndSpawn(true);
         else if (key === 'is-enabled') this._updateEnabledState();
         else if (key === 'jump-power') this._gnomelets.forEach(p => p.updateJumpPower());
+        else if (key.startsWith('health-')) this._gnomelets.forEach(p => this._applyHealth(p));
     }
 
     _hardReset() {
@@ -164,8 +163,10 @@ export class GnomeletManager {
     }
 
     _queueDemon(type) {
-        const ticks = DEMON_RESPAWN_MIN +
-            Math.floor(Math.random() * (DEMON_RESPAWN_MAX - DEMON_RESPAWN_MIN + 1));
+        // Espera configurável (no GNOME era fixa em 100–200 ticks, 5 a 10 s)
+        const min = this._settings.get_int('demon-respawn-min');
+        const max = this._settings.get_int('demon-respawn-max');
+        const ticks = min + Math.floor(Math.random() * (max - min + 1));
         this._demonQueue.push({ type, ticks });
     }
 
@@ -236,12 +237,24 @@ export class GnomeletManager {
     _createCharacter(type, frames, w, h, provider) {
         const args = [type, frames, w, h, this._settings, provider];
         const cbFor = (owner) => (x, y, vx, vy, dmg) => this._spawnProjectile(x, y, vx, vy, owner, dmg);
+        let p;
         switch (type) {
-            case 'Imp':        return new Imp(...args, cbFor('imp'));
-            case 'Cacodemon':  return new Cacodemon(...args, cbFor('caco'));
-            case 'DoomSlayer': return new DoomSlayer(...args, cbFor('slayer'));
+            case 'Imp':        p = new Imp(...args, cbFor('imp')); break;
+            case 'Cacodemon':  p = new Cacodemon(...args, cbFor('caco')); break;
+            case 'DoomSlayer': p = new DoomSlayer(...args, cbFor('slayer')); break;
             default:           return new Gnomelet(...args);
         }
+        this._applyHealth(p, true);
+        return p;
+    }
+
+    /** Vida máxima configurável dos personagens Doom; quem está vivo mantém a proporção. */
+    _applyHealth(p, fresh = false) {
+        const maxHp = this._settings.get_int(`health-${p._typeName}`);
+        if (!(p._maxHp > 0) || !(maxHp > 0) || maxHp === p._maxHp) return;
+        if (fresh) p._hp = maxHp;
+        else if (p._hp > 0) p._hp = Math.max(1, Math.round(p._hp * maxHp / p._maxHp));
+        p._maxHp = maxHp;
     }
 
     _spawnProjectile(x, y, vx, vy, owner, damage) {
