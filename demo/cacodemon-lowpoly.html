@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cacodemon · Low Poly</title>
+<style>
+  :root{--bg:#15110f;--panel:#1d1815;--rule:#4a3a30;--ink:#e8dcc4;--soft:#9a8c78;--hot:#d8571a;--green:#6fb04a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}
+  h1{margin:0;font:800 26px/1 Impact,'Arial Narrow',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--hot)}
+  h2{margin:0 0 8px;font:700 11px/1 ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--soft)}
+  header{padding:14px 18px;border-bottom:1px solid var(--rule)}
+  header p{margin:4px 0 0;color:var(--soft)}
+  main{display:grid;grid-template-columns:minmax(320px,1fr) 340px;min-height:calc(100vh - 70px)}
+  @media(max-width:820px){main{grid-template-columns:1fr}}
+  .stagecol{padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;border-right:1px solid var(--rule)}
+  #wrap{position:relative;border:5px solid #f5e9c9;border-radius:18px;overflow:hidden;cursor:grab;touch-action:none;line-height:0;
+    width:min(92vw,calc((100vh - 190px) * 0.5625));min-width:270px;aspect-ratio:270/480;background:#000}
+  #wrap:active{cursor:grabbing}
+  #view{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;image-rendering:pixelated}
+  #lbl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transition:opacity .25s}
+  #lbl text{font:700 9px ui-monospace,Menlo,Consolas,monospace;fill:#fff6dc;paint-order:stroke;stroke:#4a2e22;stroke-width:2.6px;letter-spacing:.04em}
+  #lbl text.sub{font-weight:400;font-size:7px;fill:#fff0cf}
+  #lbl polyline{fill:none;stroke:#4a2e22;stroke-width:1.4;shape-rendering:crispEdges}
+  #lbl circle{fill:#fff6dc;stroke:#4a2e22;stroke-width:1.2}
+  .row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  button{font:inherit;color:var(--ink);background:#26201c;border:1px solid var(--rule);padding:6px 11px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase}
+  button:hover{border-color:var(--hot)}
+  button[aria-pressed=true]{background:var(--hot);border-color:var(--hot);color:#1a0d06;font-weight:700}
+  .side{padding:16px;background:var(--panel)}
+  .sec{border-top:1px solid var(--rule);padding-top:12px;margin-top:14px}
+  .sec:first-child{border-top:0;margin-top:0;padding-top:0}
+  #atlas{display:block;width:192px;height:192px;image-rendering:pixelated;border:1px solid var(--rule)}
+  dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
+  dt{color:var(--soft)} dd{margin:0}
+  .ok{color:var(--green)}
+  .hint{color:var(--soft);margin:8px 0 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Cacodemon · Low Poly</h1>
+  <p>~600 triângulos · esfera flutuante, olho único e boca enorme · flat shading · textura 64×64 pintada por código · 270×480 sem suavização · vértices na grade · pontilhado Bayer · corte aberto com uma peça rotulada.</p>
+</header>
+<main>
+  <section class="stagecol">
+    <div id="wrap">
+      <canvas id="view" width="270" height="480"></canvas>
+      <svg id="lbl" viewBox="0 0 270 480" preserveAspectRatio="none">
+        <polyline id="lead" points=""/>
+        <circle id="dot" r="3" cx="0" cy="0"/>
+        <text id="t1" x="263" y="22" text-anchor="end">NÚCLEO DE PLASMA</text>
+        <text id="t2" class="sub" x="263" y="32" text-anchor="end">munição das bolas azuis</text>
+      </svg>
+    </div>
+    <div class="row">
+      <button id="bSlice" aria-pressed="true">Corte (S)</button>
+      <button id="bDither" aria-pressed="true">Dither (D)</button>
+      <button id="bWire" aria-pressed="false">Wire (W)</button>
+      <button id="bAuto" aria-pressed="true">Girar (A)</button>
+    </div>
+  </section>
+  <aside class="side">
+    <div class="sec">
+      <h2>Orçamento</h2>
+      <dl id="stats"></dl>
+    </div>
+    <div class="sec">
+      <h2>Atlas 64×64 (pintado em código)</h2>
+      <canvas id="atlas" width="64" height="64"></canvas>
+      <p class="hint">4×4 células de 16 px: corpo · barriga · base escura · chifre / sombra · forro · osso · plasma / olho · — · intestino · órgão / grama · terra · boca · cérebro</p>
+    </div>
+    <div class="sec">
+      <h2>Pipeline</h2>
+      <p class="hint" style="margin-top:0">geometria → vértices arredondados na grade → render em 270×480 (nearest) → snap de vértice em pixel (estilo PS1) → quantização + Bayer 4×4 → ampliado sem filtro.<br>Arraste para girar.</p>
+    </div>
+  </aside>
+</main>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ================= parâmetros ================= */
+const W = 270, H = 480;        // resolução de render
+const CELL = 0.1;              // 1 célula da grade = 0.1 unidade
+const GRID = 0.5;              // vértices são arredondados para múltiplos de GRID células
+const BUDGET = 700; 
+const LEVELS = 7;              // níveis por canal na quantização
+
+/* ================= textura 64×64 pintada em código (4×4 células de 16 px) ================= */
+const cells = {
+  skin :[0 ,0 ,16,16], gray :[16,0 ,16,16], pink :[32,0 ,16,16], horn :[48,0 ,16,16],
+  hoof :[0 ,16,16,16], flesh:[16,16,16,16], bone :[32,16,16,16], heart:[48,16,16,16],
+  eye  :[0 ,32,16,16], fist :[16,32,16,16], muzzle:[32,32,16,16], organ:[48,32,16,16],
+  gut  :[0 ,48,16,16], stone:[16,48,16,16], mouth:[32,48,16,16], brow :[48,48,16,16],
+};
+const atlas = document.createElement('canvas');
+atlas.width = atlas.height = 64;
+const ag = atlas.getContext('2d');
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+function rng(seed){ let s = seed>>>0; return ()=> (s = (s*1664525 + 1013904223)>>>0) / 4294967296; }
+function paint(name, fn){
+  const [x0,y0,w,h] = cells[name];
+  const put = (x,y,c)=>{ ag.fillStyle=c; ag.fillRect(x0+((x%w)+w)%w, y0+((y%h)+h)%h, 1, 1); };
+  fn(put, w, h, rng(name.split('').reduce((a,c)=>a*31+c.charCodeAt(0),7)));
+}
+const pick = (pal,v)=>pal[clamp(Math.floor(v*pal.length),0,pal.length-1)];
+const noisy = (name, pal, f)=>paint(name,(put,w,h,r)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,f(x,y,r)));
+});
+
+const flat=(name,pal,amp=.22,extra)=>paint(name,(put,w,h,r)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.5+(r()-.5)*amp+.06*Math.sin(x*.7+y*.5)));
+  if(extra) extra(put,w,h,r);
+});
+const lite=(put,w,h,r,c,n=6)=>{ for(let i=0;i<n;i++){ const x=r()*w|0,y=r()*h|0; put(x,y,c); put(x+1,y,c); } };
+flat('skin',['#a82e24','#b8382a','#c8432e','#d6523a','#e06a48'],.3,(p,w,h,r)=>{ lite(p,w,h,r,'#8a2420',7); lite(p,w,h,r,'#ea8060',4); });
+flat('gray',['#c4503c','#d0604a','#dc705a','#e8826a'],.25);
+flat('pink',['#5a1a30','#6a2038','#7a2a46','#8a3454'],.25);
+flat('horn',['#d8c8a0','#e8dcb8','#f5ecd0'],.2,(p,w,h)=>{ for(let y=4;y<h;y+=5) for(let x=0;x<w;x++) p(x,y,'#b8a880'); });
+flat('hoof',['#4f7a40','#5a8a4a','#669a56'],.2);
+flat('flesh',['#5a1a28','#722434','#8a3040','#a24456'],.3,(p,w,h,r)=>{ for(let y=2;y<h;y+=5) for(let x=0;x<w;x++) p(x,y,'#4a1420'); });
+flat('bone',['#d8c8a0','#e8dcb8','#f5ecd0','#fffaea'],.3);
+paint('heart',(put,w,h,r)=>{
+  const pal=['#102a80','#2050d0','#40a0ff','#90e0ff','#ffffff'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const f=((x>>2)+(y>>2))%3; put(x,y,pick(pal,.28+f*.22+(r()-.5)*.16)); }
+  for(let i=0;i<5;i++) put(2+(r()*(w-4)|0),2+(r()*(h-4)|0),'#ffffff');
+});
+paint('eye',(put,w,h)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const d=Math.hypot(x-w/2+.5,y-h/2+.5);
+    put(x,y, d<3?'#101010': d<5?'#58b038': d<7?'#a8d848':'#e8e8a0');
+  }
+  for(const [x,y] of [[5,4],[6,4],[5,5]]) put(x,y,'#ffffff');
+});
+flat('fist',['#7a3a30','#974b40'],.2);
+flat('muzzle',['#c8606c','#d8707c','#e8828c'],.3,(p,w,h,r)=>{ for(let x=0;x<w;x++) p(x,(x*3)%h,'#a84a58'); });
+flat('organ',['#c8607a','#d8788c','#e890a0'],.3);
+paint('brow',(put,w,h,r)=>{
+  const pal=['#b04868','#c8607a','#d8788c','#e890a0'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.5+.3*Math.sin(x*1.2+Math.sin(y*.9)*2)+(r()-.5)*.2));
+});
+flat('gut',['#74aa5e','#7cb266','#83b96c','#90c478'],.35,(p,w,h,r)=>{ for(let i=0;i<5;i++){ const x=2+(r()*(w-5)|0),y=2+(r()*(h-5)|0); p(x,y,'#a8d890'); p(x-1,y+1,'#a8d890'); p(x+1,y+1,'#a8d890'); } });
+flat('stone',['#a8916a','#b8a17a','#c4ae88'],.3);
+paint('mouth',(put,w,h,r)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(['#2a0a14','#3e1220','#521a2a'],.5+(r()-.5)*.8));
+  for(let x=0;x<w;x+=3) for(let y=0;y<5;y++) if(y<5-Math.abs(1-(x%3))*2) put(x,y,'#f5ecd0');
+  for(let x=1;x<w;x+=3) for(let y=0;y<5;y++) if(y<5-Math.abs(1-((x+1)%3))*2) put(x,h-1-y,'#f5ecd0');
+  for(let y=7;y<13;y++) for(let x=3;x<13;x++) put(x,y,y<10?'#8a5a9a':'#a870b0');
+});
+
+const tex = new THREE.CanvasTexture(atlas);
+tex.magFilter = tex.minFilter = THREE.NearestFilter;
+tex.generateMipmaps = false;
+tex.colorSpace = THREE.SRGBColorSpace;
+
+/* ================= geometria: tubos varridos (sweep) ================= */
+const D2R = Math.PI/180;
+const snap = v => Math.round(v/GRID)*GRID || 0;
+const parts = [];
+const V = (x,y,z)=>new THREE.Vector3(x,y,z);
+const area2 = (a,b,c)=>{
+  const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+  return Math.hypot(u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]);
+};
+/* path: [x,y,z,rx,rz?] — anéis perpendiculares ao caminho; n lados; UV cilíndrico por face.
+   cellAt(i,k) escolhe a célula por face; rx=rz=0 vira ápice; mirror copia em -x. */
+function sweep(name, cell, o){
+  const n=o.n||8, ph=(o.ph||0)*D2R, P=o.path, m=P.length-1;
+  const ref=V(...(o.ref||[1,0,0]));
+  const ctr=P.map(q=>V(q[0],q[1],q[2]));
+  const ring=P.map((q,i)=>{
+    const T=ctr[Math.min(m,i+1)].clone().sub(ctr[Math.max(0,i-1)]).normalize();
+    let U=ref.clone().addScaledVector(T,-ref.dot(T));
+    if(U.lengthSq()<1e-4) U=V(0,0,1).addScaledVector(T,-T.z);
+    U.normalize();
+    const Wv=new THREE.Vector3().crossVectors(U,T);
+    const rx=q[3], rz=q[4]===undefined?q[3]:q[4];
+    return Array.from({length:n},(_,k)=>{
+      const a=ph+k*2*Math.PI/n;
+      const v=ctr[i].clone().addScaledVector(U,rx*Math.cos(a)).addScaledVector(Wv,rz*Math.sin(a));
+      return [snap(v.x),snap(v.y),snap(v.z)];
+    });
+  });
+  const mk=(a,b,c,uv,cn)=>{ const t=[a,b,c]; if(uv) t.uv=uv; t.cell=cn; return t; };
+  const tris=[];
+  for(let i=0;i<m;i++){
+    const t0=o.gt?1-i/m:1, t1=o.gt?1-(i+1)/m:0;
+    for(let k=0;k<n;k++){
+      const cn=o.cellAt?o.cellAt(i,k):((o.segCells&&o.segCells[i])||cell);
+      const k1=(k+1)%n, s0=((2*k)%n)/n, s1=s0+2/n;
+      const A=ring[i][k], B=ring[i+1][k], C=ring[i+1][k1], D=ring[i][k1];
+      tris.push(mk(A,B,C,[[s0,t0],[s0,t1],[s1,t1]],cn), mk(A,C,D,[[s0,t0],[s1,t1],[s1,t0]],cn));
+    }
+  }
+  const last=ring[m], first=ring[0], cc=o.capCell||cell;
+  if(o.capEnd)   for(let k=1;k<n-1;k++) tris.push(mk(last[0],last[k+1],last[k],null,cc));
+  if(o.capStart) for(let k=1;k<n-1;k++) tris.push(mk(first[0],first[k],first[k+1],null,cc));
+  const good=tris.filter(t=>area2(...t)>1e-6);
+  const group=o.group||'body';
+  parts.push({name,cell,group,tris:good});
+  if(o.mirror) parts.push({name:name+'_R',cell,group,tris:good.map(t=>{
+    const q=[[-t[0][0],t[0][1],t[0][2]],[-t[2][0],t[2][1],t[2][2]],[-t[1][0],t[1][1],t[1][2]]];
+    if(t.uv) q.uv=[t.uv[0],t.uv[2],t.uv[1]]; q.cell=t.cell; return q;
+  })});
+}
+const mir = p=>p.map(q=>[-q[0],...q.slice(1)]);
+
+const spike=(name,a,b,r,o={})=>sweep(name,o.cell||'bone',{n:o.n||3,mirror:o.mirror,gt:true,ref:[0,0,1],path:[[...a,r],[...b,0,0]]});
+const horn=(name,p0,p1,p2,r,mirror=true)=>sweep(name,'horn',{n:5,mirror,gt:true,ref:[0,0,1],path:[[...p0,r],[...p1,r*.65],[...p2,0,0]]});
+
+/* ---- corpo esférico (12 lados): base escura, miolo vermelho ---- */
+sweep('body','skin',{n:12,
+  path:[[0,8,0,0,0],[0,9.5,0,7],[0,13,0,11.5],[0,17.5,0,14],[0,22,0,14.8],[0,27,0,13.5],[0,31,0,10],[0,34,0,5],[0,35.5,0,0,0]],
+  cellAt:i=>i<=1?'pink':(i===2?'gray':'skin')});
+/* ---- olho único gigante ---- */
+sweep('eye','eye',{n:10,group:'eyes',capEnd:true,
+  path:[[0,25.5,12,5.4,5.4],[0,25.5,15.2,4.6,4.6]]});
+/* ---- boca escancarada com presas ---- */
+sweep('mouth','pink',{n:10,capEnd:true,capCell:'mouth',
+  path:[[0,14.5,10.8,8,4.8],[0,14,14,8.4,5]]});
+for(const sx of [-1,1]){
+  spike('fangU'+sx,[sx*4.4,17.6,13.8],[sx*4.6,13.8,14.2],1.1,{n:4});
+  spike('fangD'+sx,[sx*3.6,10.8,13.6],[sx*3.8,14.6,14],1,{n:4});
+}
+/* ---- chifres pequenos no topo e nas laterais ---- */
+horn('hornTop',[4.4,33,1],[6,36.5,0],[5.6,41,-1],2.4);
+horn('hornSide',[10.8,29.5,1.5],[14.4,32.5,1],[17.4,37,0],2.2);
+horn('hornLow',[13.6,23,0],[17.6,23.6,-.5],[21,26,-1],1.9);
+
+/* ---- interior (aparece no corte) ---- */
+sweep('eyeball','eye',{n:8,group:'inner',path:[[0,20.5,6.5,0,0],[0,22.5,7,4.6,4.6],[0,26.5,7,5.2,5.2],[0,30.5,6.5,0,0]]});
+sweep('nerve','organ',{n:4,ph:45,group:'inner',path:[[-.8,24,3,1.2],[-2.4,22,-2,1.2],[-4,19.5,-5,1.2]]});
+sweep('brain','brow',{n:8,group:'inner',path:[[-4.5,29,-4,0,0],[-4.5,30.5,-4,3.4,3.4],[-4.5,33,-4,4.2,4],[-4.5,35,-4,0,0]]});
+const coil=[]; for(let i=0;i<9;i++){ const t=i*1.1; coil.push([-5+3.2*Math.cos(t),10.5+i*.7,-1+3.5*Math.sin(t),1.7]); }
+sweep('coil','muzzle',{n:6,group:'inner',capStart:true,capEnd:true,path:coil});
+sweep('core','heart',{n:8,group:'heart',path:[[-4.5,14.5,-2,0,0],[-4.5,16.2,-2,3.4,3.4],[-4.5,19.2,-2,4.4,4.4],[-4.5,22,-2,0,0]]});
+const HC=[-4.5,18.4,-2];
+
+/* ---- ilha: terra, grama e sombra do monstro ---- */
+sweep('soil','stone',{n:10,group:'plinth',path:[[0,-7,0,18.5],[0,-1.5,0,20]]});
+sweep('lawn','gut',{n:10,group:'plinth',capEnd:true,path:[[0,-1.5,0,20],[0,0,0,19.4]]});
+sweep('shade','hoof',{n:8,group:'plinth',capEnd:true,path:[[0,.1,0,11,8],[0,.25,0,11,8]]});
+
+/* ---- monta BufferGeometry: UV cilíndrico explícito (sweeps) ou planar por parte (tampas) ---- */
+function buildGeo(list, forceCell, center){
+  const pos=[], uv=[];
+  for(const p of list){
+    const mn=[1e9,1e9,1e9], mx=[-1e9,-1e9,-1e9];
+    for(const t of p.tris) for(const v of t) for(let i=0;i<3;i++){ mn[i]=Math.min(mn[i],v[i]); mx[i]=Math.max(mx[i],v[i]); }
+    const nrm=(v,i)=>{ const d=mx[i]-mn[i]; return d>1e-6?(v[i]-mn[i])/d:.5; };
+    for(const tri of p.tris){
+      const [a,b,c]=tri;
+      const [cx,cy,cw,ch]=cells[forceCell||tri.cell||p.cell];
+      const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], w=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+      const n=[u[1]*w[2]-u[2]*w[1], u[2]*w[0]-u[0]*w[2], u[0]*w[1]-u[1]*w[0]].map(Math.abs);
+      [a,b,c].forEach((v,vi)=>{
+        const q=center?[v[0]-center[0],v[1]-center[1],v[2]-center[2]]:v;
+        pos.push(q[0]*CELL, q[1]*CELL, q[2]*CELL);
+        let s,t;
+        if(tri.uv){ [s,t]=tri.uv[vi]; }
+        else if(n[1]>=n[0] && n[1]>=n[2]){ s=nrm(v,0); t=nrm(v,2); }
+        else if(n[2]>=n[0])              { s=nrm(v,0); t=1-nrm(v,1); }
+        else                             { s=nrm(v,2); t=1-nrm(v,1); }
+        uv.push((cx+.5+s*(cw-1))/64, 1-(cy+.5+t*(ch-1))/64);
+      });
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.computeVertexNormals();
+  return g;
+}
+
+/* ================= materiais: flat shading + snap de vértice em pixel ================= */
+const clip = new THREE.Plane(new THREE.Vector3(-1,0,0), 0);      // mantém x <= constant
+function snapPx(m){
+  m.onBeforeCompile = s=>{
+    s.vertexShader = s.vertexShader.replace('#include <project_vertex>',
+      `#include <project_vertex>
+       { const vec2 hr = vec2(${(W/2).toFixed(1)}, ${(H/2).toFixed(1)});
+         vec4 sp = gl_Position; sp.xy = floor(sp.xy/sp.w*hr + .5)/hr*sp.w; gl_Position = sp; }`);
+  };
+  return m;
+}
+const common = {flatShading:true, clippingPlanes:[clip]};
+const matOut  = snapPx(new THREE.MeshLambertMaterial({map:tex, ...common}));
+const matIn   = snapPx(new THREE.MeshLambertMaterial({map:tex, side:THREE.BackSide, emissive:0x2a0a10, ...common}));
+const matHeart= snapPx(new THREE.MeshLambertMaterial({map:tex, emissive:0x102a70, ...common}));
+const matEye  = snapPx(new THREE.MeshBasicMaterial({map:tex, clippingPlanes:[clip]}));
+const matPlinth = snapPx(new THREE.MeshLambertMaterial({map:tex, flatShading:true}));
+
+/* ================= cena ================= */
+const canvas = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:false, alpha:false});
+renderer.setPixelRatio(1);
+renderer.setSize(W,H,false);
+renderer.localClippingEnabled = true;
+
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xfff8e7, 0x85aa79, 2.0));
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.6); sun.position.set(6,8,7); scene.add(sun);
+const rim = new THREE.DirectionalLight(0xffd0a0, .5); rim.position.set(-6,3,-5); scene.add(rim);
+
+const grp = g=>parts.filter(p=>p.group===g);
+const geoBody=buildGeo(grp('body')), geoBodyIn=buildGeo(grp('body'),'flesh');
+const body  = new THREE.Mesh(geoBody, matOut);
+const inner = new THREE.Mesh(geoBodyIn, matIn);
+const organs= new THREE.Mesh(buildGeo(grp('inner')), matOut);
+const eyes  = new THREE.Mesh(buildGeo(grp('eyes')), matEye);
+const heart = new THREE.Mesh(buildGeo(grp('heart'),null,HC), matHeart);
+const plinth= new THREE.Mesh(buildGeo(grp('plinth')), matPlinth);
+heart.position.set(HC[0]*CELL, HC[1]*CELL, HC[2]*CELL);
+const rig = new THREE.Group(); rig.add(body, inner, organs, eyes, heart); scene.add(rig, plinth);
+const triCount=[body,organs,eyes,heart,plinth].reduce((n,m)=>n+m.geometry.attributes.position.count/3,0);
+const triBy=Object.fromEntries(['body','inner','eyes','heart','plinth'].map(g=>[g,grp(g).reduce((n,p)=>n+p.tris.length,0)]));
+
+const camera = new THREE.PerspectiveCamera(28, W/H, .5, 200);
+const TARGET = new THREE.Vector3(0,1.9,0);
+
+/* render target baixo + pós-processo (quantização + Bayer) */
+const rt = new THREE.WebGLRenderTarget(W,H,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter,depthBuffer:true});
+const post = new THREE.ShaderMaterial({
+  uniforms:{tDiffuse:{value:rt.texture}, uDither:{value:1}, uLevels:{value:LEVELS}},
+  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
+  fragmentShader:`
+    uniform sampler2D tDiffuse; uniform float uDither, uLevels; varying vec2 vUv;
+    const float M[16] = float[16](0.,8.,2.,10., 12.,4.,14.,6., 3.,11.,1.,9., 15.,7.,13.,5.);
+    void main(){
+      vec4 s = texture2D(tDiffuse, vUv);
+      vec3 bg = mix(vec3(.62,.80,.90), vec3(.20,.46,.80), vUv.y);
+      vec3 col = mix(bg, s.rgb, s.a);
+      col = linearToOutputTexel(vec4(col,1.)).rgb;
+      vec2 p = floor(gl_FragCoord.xy);
+      float t = (M[int(mod(p.x,4.)) + 4*int(mod(p.y,4.))] + .5)/16. - .5;
+      float L = uLevels - 1.;
+      gl_FragColor = vec4(floor(col*L + .5 + t*uDither)/L, 1.);
+    }`,
+  depthTest:false, depthWrite:false
+});
+const postScene = new THREE.Scene();
+postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), post));
+const postCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+
+/* ================= interação ================= */
+const state = {slice:1, sliceT:1, dither:true, wire:false, auto:true, az:1.12};
+const $ = id=>document.getElementById(id);
+const sync = ()=>{
+  $('bSlice').setAttribute('aria-pressed',!!state.slice);
+  $('bDither').setAttribute('aria-pressed',state.dither);
+  $('bWire').setAttribute('aria-pressed',state.wire);
+  $('bAuto').setAttribute('aria-pressed',state.auto);
+  post.uniforms.uDither.value = state.dither?1:0;
+  matOut.wireframe = matIn.wireframe = matHeart.wireframe = matEye.wireframe = state.wire;
+};
+const act = {
+  S:()=>state.slice^=1, D:()=>state.dither=!state.dither,
+  W:()=>state.wire=!state.wire, A:()=>state.auto=!state.auto,
+};
+$('bSlice').onclick = ()=>{act.S();sync();};
+$('bDither').onclick= ()=>{act.D();sync();};
+$('bWire').onclick  = ()=>{act.W();sync();};
+$('bAuto').onclick  = ()=>{act.A();sync();};
+addEventListener('keydown',e=>{ const f=act[e.key.toUpperCase()]; if(f&&!e.ctrlKey&&!e.metaKey){f();sync();} });
+let drag=null;
+const wrap=$('wrap');
+wrap.addEventListener('pointerdown',e=>{drag=e.clientX; state.auto=false; sync(); wrap.setPointerCapture(e.pointerId);});
+wrap.addEventListener('pointermove',e=>{ if(drag!==null){ state.az -= (e.clientX-drag)*.012; drag=e.clientX; } });
+wrap.addEventListener('pointerup',()=>drag=null);
+sync();
+
+/* HUD */
+$('atlas').getContext('2d').drawImage(atlas,0,0);
+$('stats').innerHTML = `
+  <dt>triângulos</dt><dd class="${triCount<=BUDGET?'ok':''}">${triCount} / ${BUDGET}</dd>
+  <dt>por grupo</dt><dd>${Object.entries(triBy).map(([k,v])=>k+' '+v).join(' · ')}</dd>
+  <dt>textura</dt><dd>64×64 · 16 células · nearest</dd>
+  <dt>render</dt><dd>${W}×${H}</dd>
+  <dt>grade</dt><dd>${GRID} cél = ${GRID*CELL} u</dd>
+  <dt>cores</dt><dd>${LEVELS}³ + Bayer 4×4</dd>
+  <dt>sombreamento</dt><dd>flat</dd>`;
+
+/* ================= loop ================= */
+const v3 = new THREE.Vector3();
+const lead=$('lead'), dot=$('dot'), lbl=$('lbl');
+const t1=$('t1'), t2=$('t2');
+function frame(ms){
+  const t = ms/1000;
+  if(state.auto) state.az = 1.12 + .3*Math.sin(t*.45);
+  const d=14.5, el=.2;
+  camera.position.set(Math.sin(state.az)*Math.cos(el)*d, TARGET.y+Math.sin(el)*d, Math.cos(state.az)*Math.cos(el)*d);
+  camera.lookAt(TARGET);
+
+  state.sliceT += (state.slice - state.sliceT)*.12;
+  clip.constant = (1-state.sliceT)*3.2;
+  inner.visible = state.sliceT > .01;
+
+  const beat = Math.pow(Math.max(0,Math.sin(t*Math.PI*2*1)),4);
+  heart.scale.setScalar(1 + .12*beat);
+  rig.position.y = Math.sin(t*1.6)*.12 + .1;
+
+  renderer.setRenderTarget(rt);
+  renderer.setClearColor(0x000000,0);
+  renderer.clear();
+  renderer.render(scene,camera);
+  renderer.setRenderTarget(null);
+  renderer.render(postScene,postCam);
+
+  // rótulo: ponta do coração projetada na tela
+  const show = state.sliceT>.97 && Math.sin(state.az)>.6;
+  lbl.style.opacity = show?1:0;
+  if(show){
+    heart.getWorldPosition(v3); v3.project(camera);
+    const hx=(v3.x*.5+.5)*W, hy=(1-(v3.y*.5+.5))*H;
+    const ly = Math.round(hy);
+    t1.setAttribute('y', ly-14); t2.setAttribute('y', ly-5);
+    lead.setAttribute('points',`263,${ly+1} ${(hx+4).toFixed(1)},${ly+1}`);
+    dot.setAttribute('cx',hx.toFixed(1)); dot.setAttribute('cy',hy.toFixed(1));
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+window.__baron = {triCount, triBy, state};
+</script>
+</body>
+</html>
+
+</script>
+</body>
+</html>
