@@ -41,7 +41,7 @@
 <body>
 <header>
   <h1>Baron of Hell · Low Poly</h1>
-  <p>300 triângulos · flat shading · textura 64×64 pintada por código · 270×480 sem suavização · vértices na grade · pontilhado Bayer · corte aberto com uma peça rotulada.</p>
+  <p>300 triângulos · sólidos de revolução arredondados · flat shading · textura 64×64 pintada por código · 270×480 sem suavização · vértices na grade · pontilhado Bayer · corte aberto com uma peça rotulada.</p>
 </header>
 <main>
   <section class="stagecol">
@@ -87,7 +87,7 @@ import * as THREE from 'three';
 /* ================= parâmetros ================= */
 const W = 270, H = 480;        // resolução de render
 const CELL = 0.1;              // 1 célula da grade = 0.1 unidade
-const GRID = 1;                // vértices são arredondados para múltiplos de GRID células
+const GRID = 0.5;               // vértices são arredondados para múltiplos de GRID células
 const BUDGET = 300;
 const LEVELS = 6;              // níveis por canal na quantização
 
@@ -193,15 +193,13 @@ paint('fist',(put,w,h,r)=>{
   }
 });
 
-paint('jaw',(put,w,h,r)=>{
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(['#2a050a','#46080f','#6e1216'],.5+(r()-.5)*.9));
-  for(let x=0;x<w;x++){                                  // dentes
-    const wid = 4;
-    for(let y=0;y<7;y++){
-      const half=(1+y*.55)/2, c=(Math.floor(x/wid)*wid)+wid/2-.5;
-      if(Math.abs(x-c)<=half) put(x,y, x<c?'#fff4d0':'#c9bb8e');
-    }
-  }
+paint('jaw',(put,w,h,r)=>{                 // focinho: narinas + boca com presas
+  const pal=['#8e3038','#a8444c','#c25c62','#d87a7a'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.5+(r()-.5)*.8+Math.sin(x*.7)*.1));
+  for(const nx of [3,10]) for(let dy=0;dy<2;dy++) for(let dx=0;dx<3;dx++) put(nx+dx,4+dy,'#2a050a');
+  for(let x=1;x<w-1;x++) put(x,10,'#2a050a');
+  for(let x=1;x<w-1;x++){ put(x,11,'#46080f'); if(x%3===1) { put(x,11,'#fff4d0'); put(x,12,'#c9bb8e'); } }
+  for(const tx of [1,14]) for(let y=7;y<14;y++) put(tx,y,y<12?'#fff4d0':'#c9bb8e');   // presas
 });
 
 const tex = new THREE.CanvasTexture(atlas);
@@ -221,8 +219,8 @@ const area2 = (a,b,c)=>{
   const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
   return Math.hypot(u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]);
 };
-function push(name, cell, tris){
-  const ok = tris.filter(t=>{ const good = area2(...t) > 1e-6; if(!good) degenerate++; return good; });
+function push(name, cell, tris, quiet){
+  const ok = tris.filter(t=>{ const good = area2(...t) > 1e-6; if(!good && !quiet) degenerate++; return good; });
   parts.push({name, cell, tris:ok});
 }
 /* caixa afunilada/rotacionada; tip = pirâmide; mirror = cópia em -x */
@@ -246,64 +244,99 @@ function box(name, cell, c, s, o={}){
   if(o.mirror) push(name+'_R', cell, tris.map(([a,b,c])=>[[-a[0],a[1],a[2]],[-c[0],c[1],c[2]],[-b[0],b[1],b[2]]]));
 }
 
-/* ---- pernas ---- */
-box('hoof' ,'hoof' ,[6,2,1.5] ,[8,4,11],{mirror:true});
-box('shin' ,'pants',[6,10,0]  ,[8,12,8],{mirror:true,top:[1.12,1.12]});
-box('thigh','pants',[6,21.5,0],[10,11,10],{mirror:true});
-/* ---- tronco ---- */
-box('pelvis' ,'pants',[0,29,0],[22,6,10]);
-box('belt'   ,'hoof' ,[0,32,0],[22,2,12]);
-box('abdomen','skin' ,[0,37,0],[14,8,10],{top:[1.15,1]});
-box('chest'  ,'skin' ,[0,47,0],[16,12,12],{top:[1.5,1.05]});
-/* ---- braços ---- */
-box('shoulder','skin',[15,50,0],[10,10,10],{mirror:true,rot:[0,0,-12]});
-box('upperarm','skin',[16,40,0],[8,12,8] ,{mirror:true});
-box('forearm' ,'skin',[17,30,2],[8,10,8] ,{mirror:true,rot:[-12,0,0]});
-box('fist'    ,'fist',[17,21,4],[8,8,8]  ,{mirror:true});
-/* ---- cabeça ---- */
-box('skull','skin',[0,58,0]  ,[12,10,12],{top:[.9,.95]});
-box('snout','skin',[0,56.5,8],[8,5,6]);
-box('jaw'  ,'jaw' ,[0,52.5,8],[8,3,6]);
-box('hornA','horn',[8,64,0]    ,[4,5,4],{mirror:true,rot:[0,0,-35],top:[.6,.6],noTop:true,noBottom:true});
-box('hornB','horn',[11.6,66.3,0],[3,5,3],{mirror:true,rot:[0,0,-60],tip:true,noBottom:true});
-/* ---- interior (visível no corte) ---- */
-box('spine','bone',[-2.5,45,-3.5],[3,24,3]);
 
-/* olhos: dois quads brilhantes colados na face do crânio */
+/* sólido de revolução: anéis [y, rx, rz, ox, oz] em ordem crescente; n lados; UV cilíndrico por face */
+function lathe(name, cell, o){
+  const n=o.n, ph=(o.ph||0)*D2R, R=o.rings, c=new THREE.Vector3(...(o.c||[0,0,0]));
+  const e=new THREE.Euler(...(o.rot||[0,0,0]).map(d=>d*D2R),'XYZ');
+  const ring=R.map(([y,rx,rz,ox=0,oz=0])=>Array.from({length:n},(_,k)=>{
+    const a=ph+k*2*Math.PI/n;
+    const v=new THREE.Vector3(rx*Math.cos(a)+ox, y, rz*Math.sin(a)+oz).applyEuler(e).add(c);
+    return [snap(v.x),snap(v.y),snap(v.z)];
+  }));
+  const mk=(a,b,c2,uv,cn)=>{ const t=[a,b,c2]; t.uv=uv; t.cell=cn; return t; };
+  const tris=[];
+  for(let i=0;i<R.length-1;i++){
+    const cn=(o.segCells&&o.segCells[i])||cell;
+    for(let k=0;k<n;k++){
+      const k1=(k+1)%n, s0=((2*k)%n)/n, s1=s0+2/n;
+      const A=ring[i][k], B=ring[i+1][k], C=ring[i+1][k1], D=ring[i][k1];
+      tris.push(mk(A,B,C,[[s0,1],[s0,0],[s1,0]],cn), mk(A,C,D,[[s0,1],[s1,0],[s1,1]],cn));
+    }
+  }
+  const last=ring[ring.length-1], first=ring[0];
+  const capCell=o.capCell||cell;
+  if(o.capTop) for(let k=1;k<n-1;k++){ const t=[last[0],last[k+1],last[k]]; t.cell=capCell; tris.push(t); }
+  if(o.capBot) for(let k=1;k<n-1;k++){ const t=[first[0],first[k],first[k+1]]; t.cell=capCell; tris.push(t); }
+  const good=tris.filter(t=>area2(...t)>1e-6);
+  push(name,cell,good,true);
+  if(o.mirror) push(name+'_R',cell,good.map(t=>{
+    const m=[[-t[0][0],t[0][1],t[0][2]],[-t[2][0],t[2][1],t[2][2]],[-t[1][0],t[1][1],t[1][2]]];
+    m.uv=t.uv&&[t.uv[0],t.uv[2],t.uv[1]]; m.cell=t.cell; return m;
+  }),true);
+}
+
+/* ---- pernas: casco → canela → coxa (um sólido só, 6 lados) ---- */
+lathe('leg','pants',{n:6,mirror:true,
+  rings:[[0,6,6.5,6,2.5],[4,4.6,4.6,6,0],[13,6.2,6,6,.5],[25,7.4,7,6,0]],
+  segCells:['hoof','pants','pants']});
+/* ---- pelve e tronco em barril (8 lados), peito projetado para frente ---- */
+lathe('pelvis','pants',{n:8,rings:[[23,10.5,7],[31,10,7]]});
+lathe('torso','skin',{n:8,rings:[[31,10,7],[40,11.5,8,0,.5],[48,14.5,9,0,1.5],[53,10.5,7.5,0,2.5]]});
+/* ---- braços: punho → antebraço → deltoide, afinando num ápice ---- */
+lathe('arm','skin',{n:6,mirror:true,
+  rings:[[19,4.3,4.3,19.5,5],[25,6,6,19,4.5],[50,7,7,16.5,1.5],[55,0,0,16.5,1.5]],
+  segCells:['fist','skin','skin']});
+/* ---- cabeça: crânio inclinado para frente, focinho (eixo z), chifres e presas ---- */
+const SKULL=[[49.5,6.5,6,0,2.5],[54.5,8.5,7.2,0,3],[61,6,5.8,0,2.8]];
+lathe('skull','skin',{n:6,capTop:true,rings:SKULL});
+lathe('snout','skin',{n:6,c:[0,52.5,0],rot:[90,0,0],capTop:true,capCell:'jaw',
+  rings:[[4,3.8,3.4],[10.5,4.6,3.8],[14,4,3.2]]});
+lathe('horn','horn',{n:4,ph:45,mirror:true,rings:[[59,2.6,2.6,5.5,2.6],[62.5,2,2,9.5,2.6],[68,0,0,13,2.6]]});
+lathe('tusk','bone',{n:3,mirror:true,rings:[[48.5,1.2,1.2,3.4,11.5],[53,0,0,4,11.5]]});
+/* ---- interior (visível no corte) ---- */
+lathe('spine','bone',{n:3,ph:90,c:[-2.5,0,-4],rings:[[33,1.7,1.7],[57,1.7,1.7]]});
+
+/* olhos: dois quads brilhantes acompanhando a face frontal inclinada do crânio */
+const frontZ=y=>{ for(let i=0;i<SKULL.length-1;i++){ const [y0,,rz0,,oz0=0]=SKULL[i],[y1,,rz1,,oz1=0]=SKULL[i+1];
+  if(y<=y1){ const t=(y-y0)/(y1-y0); return (oz0+.866*rz0)*(1-t)+(oz1+.866*rz1)*t; } } return 0; };
 const eyeTris=[];
-for(const ex of [-3.5,3.5]){
-  const [x0,x1,y0,y1,z]=[ex-1.5,ex+1.5,59,61,6];
-  const A=[snap(x0),y0,z],B=[snap(x1),y0,z],C=[snap(x1),y1,z],Dd=[snap(x0),y1,z];
+for(const sx of [-1,1]){
+  const xa=sx*1.3, xb=sx*3.5, y0=56, y1=58;
+  const q=(x,y)=>[x,y,snap(frontZ(y))+.5];
+  const A=q(Math.min(xa,xb),y0),B=q(Math.max(xa,xb),y0),C=q(Math.max(xa,xb),y1),Dd=q(Math.min(xa,xb),y1);
   eyeTris.push([A,B,C],[A,C,Dd]);
 }
 const eyesPart = {name:'eyes', cell:'eye', tris:eyeTris};
 
 /* coração: octaedro alongado, geometria relativa ao centro para poder pulsar */
-const HC=[-5,46,1];
-{ const T=[0,4,0],B=[0,-5,0],E=[4,0,0],N=[0,0,-4],Wv=[-4,0,0],S=[0,0,4];
-  var heartPart={name:'heart',cell:'heart',tris:[
+const HC=[-5,45,2];
+const heartPart=(()=>{ const T=[0,4,0],B=[0,-5,0],E=[4,0,0],N=[0,0,-4],Wv=[-4,0,0],S=[0,0,4];
+  return {name:'heart',cell:'heart',tris:[
     [T,S,E],[T,E,N],[T,N,Wv],[T,Wv,S],
-    [B,E,S],[B,N,E],[B,Wv,N],[B,S,Wv]]}; }
+    [B,E,S],[B,N,E],[B,Wv,N],[B,S,Wv]]}; })();
 
 /* ---- monta BufferGeometry com UV planar por parte, mapeada para a célula do atlas ---- */
 function buildGeo(list, forceCell){
   const pos=[], uv=[];
   for(const p of list){
-    const [cx,cy,cw,ch]=cells[forceCell||p.cell];
     const mn=[1e9,1e9,1e9], mx=[-1e9,-1e9,-1e9];
     for(const t of p.tris) for(const v of t) for(let i=0;i<3;i++){ mn[i]=Math.min(mn[i],v[i]); mx[i]=Math.max(mx[i],v[i]); }
     const nrm=(v,i)=>{ const d=mx[i]-mn[i]; return d>1e-6?(v[i]-mn[i])/d:.5; };
-    for(const [a,b,c] of p.tris){
+    for(const tri of p.tris){
+      const [a,b,c]=tri;
+      const [cx,cy,cw,ch]=cells[forceCell||tri.cell||p.cell];
       const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], w=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
       const n=[u[1]*w[2]-u[2]*w[1], u[2]*w[0]-u[0]*w[2], u[0]*w[1]-u[1]*w[0]].map(Math.abs);
-      for(const v of [a,b,c]){
+      [a,b,c].forEach((v,vi)=>{
         pos.push(v[0]*CELL, v[1]*CELL, v[2]*CELL);
         let s,t;
-        if(n[1]>=n[0] && n[1]>=n[2]){ s=nrm(v,0); t=nrm(v,2); }          // topo/base
+        if(tri.uv){ [s,t]=tri.uv[vi]; }
+        else if(n[1]>=n[0] && n[1]>=n[2]){ s=nrm(v,0); t=nrm(v,2); }          // topo/base
         else if(n[2]>=n[0])         { s=nrm(v,0); t=1-nrm(v,1); }        // frente/trás
         else                        { s=nrm(v,2); t=1-nrm(v,1); }        // lados
         uv.push((cx+1+s*(cw-2))/64, 1-(cy+1+t*(ch-2))/64);
-      }
+      });
     }
   }
   const g=new THREE.BufferGeometry();
@@ -355,7 +388,7 @@ scene.add(body, inner, eyes, heart);
 const triCount = [geoOut,eyes.geometry,heart.geometry].reduce((n,g)=>n+g.attributes.position.count/3,0);
 
 const camera = new THREE.PerspectiveCamera(28, W/H, .5, 100);
-const TARGET = new THREE.Vector3(0,3.5,0);
+const TARGET = new THREE.Vector3(0,3.4,0);
 
 /* render target baixo + pós-processo (quantização + Bayer) */
 const rt = new THREE.WebGLRenderTarget(W,H,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter,depthBuffer:true});
@@ -427,7 +460,7 @@ const t1=$('t1'), t2=$('t2');
 function frame(ms){
   const t = ms/1000;
   if(state.auto) state.az = 1.12 + .3*Math.sin(t*.45);
-  const d=15.6, el=.18;
+  const d=19.5, el=.18;
   camera.position.set(Math.sin(state.az)*Math.cos(el)*d, TARGET.y+Math.sin(el)*d, Math.cos(state.az)*Math.cos(el)*d);
   camera.lookAt(TARGET);
 
