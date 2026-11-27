@@ -5,7 +5,12 @@ import {
     State,
     FLOAT_AMPLITUDE,
     FLOAT_FREQUENCY,
+    CACO_FOLLOW_RANGE,
+    CACO_FOLLOW_STOP,
+    CACO_FOLLOW_SPEED,
+    CACO_FOLLOW_ACCEL,
 } from '../utils.js';
+import { steerToward } from '../behavior.js';
 
 /**
  * Cacodemon — Inimigo flutuante do Doom.
@@ -99,11 +104,20 @@ export const Cacodemon = GObject.registerClass(
             this._floatTimer++;
             if (this._shootCooldown > 0) this._shootCooldown--;
 
-            // Movimento horizontal com bounce nas bordas
-            this._x += this._floatSpeedX;
+            // Movimento horizontal: deriva com bounce nas bordas, ou acompanha o cursor (tímido:
+            // mantém CACO_FOLLOW_STOP de distância) com viragem suave
+            this._velX ??= this._floatSpeedX;
+            let wantVx = this._floatSpeedX;
+            const ptr = this._pointer;
+            if (ptr && ptr.dist < CACO_FOLLOW_RANGE && this._state === State.FLOATING) {
+                const dx = ptr.x - (this._x + this._displayW / 2);
+                wantVx = Math.abs(dx) < CACO_FOLLOW_STOP ? 0 : Math.sign(dx) * CACO_FOLLOW_SPEED;
+            }
+            this._velX = steerToward(this._velX, wantVx, CACO_FOLLOW_ACCEL);
+            this._x += this._velX;
             const maxX = global.stage.width - this._displayW;
-            if (this._x < 0)    { this._x = 0;    this._floatSpeedX *= -1; }
-            if (this._x > maxX) { this._x = maxX; this._floatSpeedX *= -1; }
+            if (this._x < 0)    { this._x = 0;    this._floatSpeedX = Math.abs(this._floatSpeedX);  this._velX = Math.abs(this._velX); }
+            if (this._x > maxX) { this._x = maxX; this._floatSpeedX = -Math.abs(this._floatSpeedX); this._velX = -Math.abs(this._velX); }
 
             // Movimento vertical senoidal — ancorado no terço superior do monitor
             const monitor = Main.layoutManager.primaryMonitor;
@@ -132,7 +146,7 @@ export const Cacodemon = GObject.registerClass(
             }
 
             this._updateAnimation();
-            this.actor.set_position(Math.floor(this._x), Math.floor(this._y));
+            this._placeActor();
         }
 
         _fire(allEntities) {

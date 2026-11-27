@@ -1,4 +1,15 @@
 export const UPDATE_INTERVAL_MS = 50; // Update loop runs every 50ms (~20 FPS)
+export const SMOOTH_SNAP_PX = 48;       // saltos maiores que isso (px/tick) não são suavizados
+
+// Interação com o ponteiro do mouse
+export const CURIOSITY_RANGE = 220;     // px — distância em que o personagem repara no cursor
+export const CURIOSITY_NOTICE_TICKS = 6;   // ticks perto do cursor até virar para ele (~0,3 s)
+export const CURIOSITY_STARE_TICKS = 60;   // ticks até encarar e fazer a reação especial (~3 s)
+export const CACO_FOLLOW_RANGE = 700;   // px — o Cacodemon acompanha o cursor dentro desse raio
+export const CACO_FOLLOW_STOP = 150;    // px — mas guarda essa distância horizontal (tímido)
+export const CACO_FOLLOW_SPEED = 2.4;   // px/tick
+export const CACO_FOLLOW_ACCEL = 0.12;  // px/tick² — viragem suave
+export const IDLE_VARIANT_MIN_TICKS = 20;   // pausas mais curtas são de combate e não sorteiam variação
 export const GRAVITY = 2;             // Vertical acceleration per frame
 export const WALK_SPEED = 3;          // Horizontal pixels per frame
 

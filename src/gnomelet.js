@@ -15,8 +15,14 @@ import {
     FLOAT_AMPLITUDE,
     FLOAT_FREQUENCY,
     isWindowMaximized,
-    UPDATE_INTERVAL_MS
+    UPDATE_INTERVAL_MS,
+    CURIOSITY_RANGE,
+    CURIOSITY_NOTICE_TICKS,
+    CURIOSITY_STARE_TICKS,
+    IDLE_VARIANT_MIN_TICKS,
 } from './utils.js';
+import { IdleScheduler, Curiosity, facingToward } from './behavior.js';
+import { placeActor, resetMotion } from './motion.js';
 
 /**
  * Gnomelet Class
@@ -42,6 +48,21 @@ export const Gnomelet = GObject.registerClass(
             this._animationTimer = 0; // Counter for animation timing
             this._savedFacing = Math.random() > 0.5; // Initial Direction
             this._idleTimer = 0; // Countdown for how long to stay idle
+
+            // --- Idle com variações e curiosidade com o ponteiro (ver behavior.js) ---
+            this._idleVariants = [];        // subclasses: [{ name, weight, cooldown }]; name null = só respirar
+            this._idleSched = null;
+            this._idleSchedFor = null;
+            this._wasIdle = false;
+            this._idleVariant = null;
+            this._idleVariantTicks = 0;
+            this._stareReaction = null;     // animação tocada ao ser encarado pelo cursor ('look', 'taunt'...)
+            this._pointer = null;           // { x, y, dist, level }
+            this._curiosity = new Curiosity({
+                range: CURIOSITY_RANGE,
+                noticeTicks: CURIOSITY_NOTICE_TICKS,
+                stareTicks: CURIOSITY_STARE_TICKS,
+            });
 
             // --- Configurable Dimensions ---
             this._frameWidth = frameWidth;
@@ -93,7 +114,7 @@ export const Gnomelet = GObject.registerClass(
 
             // Set initial layer based on context (Fix for maximized window visibility)
             this._resetLayer();
-            this.actor.set_position(this._x, this._y);
+            this._placeActor(true);
 
             this._updateInteraction();
             this.updateJumpPower();
@@ -143,7 +164,7 @@ export const Gnomelet = GObject.registerClass(
             this._icon.set_icon_size(iconSize);
 
             this._y = this._y + oldH - this._displayH;
-            this.actor.set_position(this._x, this._y);
+            this._placeActor(true);
         }
 
         /**
@@ -202,6 +223,7 @@ export const Gnomelet = GObject.registerClass(
         }
 
         _onDragBegin() {
+            resetMotion(this.actor);
             this._state = State.DRAGGING;
             this._vx = 0;
             this._vy = 0;
@@ -245,7 +267,7 @@ export const Gnomelet = GObject.registerClass(
             }
             global.window_group.add_child(this.actor);
 
-            this.actor.set_position(this._x, this._y);
+            this._placeActor(true);
 
             return true;
         }
@@ -256,6 +278,7 @@ export const Gnomelet = GObject.registerClass(
                 this._dragOverlay = null;
             }
 
+            resetMotion(this.actor);
             this._x = this.actor.x;
             this._y = this.actor.y;
 
@@ -362,7 +385,7 @@ export const Gnomelet = GObject.registerClass(
             if (data.idleTimer !== undefined) this._idleTimer = data.idleTimer;
             if (data.hp !== undefined) this._hp = data.hp;
 
-            this.actor.set_position(this._x, this._y);
+            this._placeActor(true);
             this.setFrame(this._frame);
         }
 
@@ -618,7 +641,7 @@ export const Gnomelet = GObject.registerClass(
             }
 
             this._updateAnimation();
-            this.actor.set_position(Math.floor(this._x), Math.floor(this._y));
+            this._placeActor();
         }
 
         /**
@@ -740,8 +763,81 @@ export const Gnomelet = GObject.registerClass(
             this._vx = dir * WALK_SPEED * 2;
         }
 
-        /** Nome da animação do manifesto correspondente ao estado atual. */
+        /** Posiciona o ator; desliza entre ticks (20 Hz → movimento contínuo) salvo `snap`. */
+        _placeActor(snap = false) {
+            placeActor(this.actor, Math.floor(this._x), Math.floor(this._y), snap);
+        }
+
+        /** Nome da animação do manifesto: a do estado, ou uma variação de idle sorteada. */
         _animationName() {
+            return this._withIdleVariant(this._stateAnimationName());
+        }
+
+        _scheduler() {
+            if (!this._idleSched || this._idleSchedFor !== this._idleVariants) {
+                this._idleSched = new IdleScheduler(this._idleVariants);
+                this._idleSchedFor = this._idleVariants;
+            }
+            return this._idleSched;
+        }
+
+        /** Toca uma variação de idle agora, se o personagem tem esse quadro e está parado. */
+        _playIdleVariant(name) {
+            const anim = this._frameImages?.animations?.[name];
+            if (!anim || this._state !== State.IDLE || this._idleVariant) return false;
+            this._idleVariant = name;
+            this._idleVariantTicks = Math.ceil(anim.frames.length * anim.ticks);
+            this._idleTimer = Math.max(this._idleTimer, this._idleVariantTicks + 20);
+            this._wasIdle = true;
+            return true;
+        }
+
+        /**
+         * Ao ficar parado, às vezes toca uma variação (recarregar, olhar, bocejar...).
+         * As variações valem só se o manifesto do personagem tiver a animação.
+         */
+        _withIdleVariant(name) {
+            if (this._state !== State.IDLE) {
+                this._wasIdle = false;
+                this._idleVariant = null;
+                return name;
+            }
+            if (!this._wasIdle) {
+                this._wasIdle = true;
+                this._idleVariant = null;
+                // Pausas curtas são de combate (esperando o cooldown): ficam só respirando
+                if (this._idleTimer >= IDLE_VARIANT_MIN_TICKS && this._idleVariants.length) {
+                    const choice = this._scheduler().pick(n => !!this._frameImages?.animations?.[n]);
+                    if (choice) this._playIdleVariant(choice);
+                }
+            }
+            if (this._idleVariant && this._idleVariantTicks-- > 0) return this._idleVariant;
+            this._idleVariant = null;
+            return name;
+        }
+
+        /**
+         * Chamado pelo Manager a cada tick com a posição do ponteiro.
+         * Calcula a curiosidade e reage quando o nível muda.
+         */
+        observePointer(px, py) {
+            if (!this.actor) return;
+            this._idleSched?.tick();
+            const cx = this._x + this._displayW / 2, cy = this._y + this._displayH / 2;
+            const dist = Math.hypot(px - cx, py - cy);
+            const before = this._curiosity.level;
+            const level = this._curiosity.update(dist);
+            this._pointer = { x: px, y: py, dist, level };
+            if (this._state === State.IDLE && level >= 1) {
+                this._savedFacing = facingToward(cx, px, this._savedFacing);
+            }
+            if (level === 2 && before < 2 && this._stareReaction) {
+                this._playIdleVariant(this._stareReaction);
+            }
+        }
+
+        /** Nome da animação do manifesto correspondente ao estado atual. */
+        _stateAnimationName() {
             switch (this._state) {
                 case State.CHASING:    return 'run';
                 case State.FLOATING:   return 'float';
@@ -770,7 +866,7 @@ export const Gnomelet = GObject.registerClass(
             this._vy = 0;
             this._savedFacing = fromLeft;
             this._state = State.WALKING;
-            this.actor?.set_position(Math.floor(this._x), Math.floor(this._y));
+            this._placeActor(true);
         }
 
         /**

@@ -672,7 +672,9 @@ export const GnomeletManager = GObject.registerClass(
                 }
 
                 this._updateDemonQueue();
+                const [pointerX, pointerY] = global.get_pointer();
                 for (let p of this._gnomelets) {
+                p.observePointer(pointerX, pointerY);
                 p.update(this._windows, forceBackground, dockContainer, this._gnomelets, this._projectiles);
             }
             this._updateProjectiles();

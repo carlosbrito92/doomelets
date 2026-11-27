@@ -140,7 +140,7 @@ Instead of the fixed numbering above, a character folder may describe its animat
 { "walk": { "frames": [0, 1, 2, 3, 4, 5, 6, 7], "ticks": 2, "loop": true } }
 ```
 
-Names: `walk`, `run`, `float`, `idle`, `jump`, `fall`, `attack`, `glory`, `hurt`, `death`, `held` (dragged by the user), `pet`, plus the Doom Slayer idle variations `reload` and `look`. If you provide a manifest, include every state the character can reach.
+Names: `walk`, `run`, `float`, `idle`, `jump`, `fall`, `attack`, `glory`, `hurt`, `death`, `held` (dragged by the user), `pet`, plus the idle variations `reload` and `look` (Doom Slayer) and `taunt` (Imp, optional). If you provide a manifest, include every state the character can reach.
 
 ## Development
 
@@ -153,6 +153,15 @@ Names: `walk`, `run`, `float`, `idle`, `jump`, `fall`, `attack`, `glory`, `hurt`
 | `scripts/kwin.sh` | Builds, installs and hot-loads the KWin version. |
 | `demo/` | three.js rigs for the Doom characters. |
 | `scripts/render_doom_sprites.py` | Renders the rigs to PNG frames and writes `animations.json`. |
+
+Behaviour logic that does not need GNOME (idle variant picking, pointer curiosity, steering) lives in `src/behavior.js` and is unit tested. The real character classes are also exercised against a stubbed Shell:
+
+```bash
+node --test tests/behavior.test.mjs
+node --import ./tests/support/register.mjs --test tests/gnomelet.test.mjs
+```
+
+Pointer interaction: a character left idle near the cursor turns to face it; after about 3 s it plays its `stare` reaction (`look` for the Doom Slayer, `taunt` for the Imp once that animation exists in its manifest). The Cacodemon drifts toward the cursor but keeps its distance. Movement between logic ticks (20 Hz) is interpolated, so motion on screen is continuous.
 
 To regenerate the Doom sprites (needs the Python packages `playwright` and `pillow`, plus a Playwright browser):
 

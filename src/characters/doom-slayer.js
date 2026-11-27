@@ -7,7 +7,8 @@ import {
 } from '../utils.js';
 
 const ENEMY_TYPES = ['Imp', 'Cacodemon'];
-const IDLE_VARIANTS = ['reload', 'look', null];   // null = só respirar
+// Variações de idle (null = só respirar). Pesos iguais = o sorteio uniforme de antes.
+const IDLE_VARIANTS = [{ name: 'reload', weight: 1 }, { name: 'look', weight: 1 }, { name: null, weight: 1 }];
 const PET_RANGE_X = 90;      // px — distância horizontal para fazer carinho
 const PET_RANGE_Y = 70;      // px — diferença vertical máxima
 const PET_DURATION = 40;     // ticks (~2s)
@@ -49,6 +50,9 @@ export const DoomSlayer = GObject.registerClass(
             this._invuln            = 0;
 
             this._spawnProjectileCb = spawnProjectileCb ?? null;
+
+            this._idleVariants   = IDLE_VARIANTS;
+            this._stareReaction  = 'look';   // o cursor parado por perto faz o Slayer olhar em volta
         }
 
         /** Inimigo vivo mais próximo (centro a centro), ou null. */
@@ -75,33 +79,6 @@ export const DoomSlayer = GObject.registerClass(
                 if (dx < PET_RANGE_X && dy < PET_RANGE_Y && dx < bestDx) { best = e; bestDx = dx; }
             }
             return best;
-        }
-
-        /** Parado por um tempo: às vezes recarrega a espingarda ou olha para os lados. */
-        _animationName() {
-            const name = super._animationName();
-            if (this._state !== State.IDLE) {
-                this._wasIdle = false;
-                this._idleVariant = null;
-                return name;
-            }
-            if (!this._wasIdle) {
-                this._wasIdle = true;
-                this._idleVariant = null;
-                // Pausas curtas são de combate (esperando o cooldown): ficam só respirando
-                if (this._idleTimer >= 20) {
-                    const choice = IDLE_VARIANTS[Math.floor(Math.random() * IDLE_VARIANTS.length)];
-                    const anim = this._frameImages?.animations?.[choice];
-                    if (anim) {
-                        this._idleVariant = choice;
-                        this._idleVariantTicks = Math.ceil(anim.frames.length * anim.ticks);
-                        this._idleTimer = Math.max(this._idleTimer, this._idleVariantTicks + 20);
-                    }
-                }
-            }
-            if (this._idleVariant && this._idleVariantTicks-- > 0) return this._idleVariant;
-            this._idleVariant = null;
-            return name;
         }
 
         takeDamage(amount) {
@@ -163,7 +140,7 @@ export const DoomSlayer = GObject.registerClass(
                     c._vx = 0; c._state = State.IDLE; c._idleTimer = Math.max(c._idleTimer, 3);
                 }
                 this._updateAnimation();
-                this.actor?.set_position(Math.floor(this._x), Math.floor(this._y));
+                this._placeActor();
                 return;
             }
 
@@ -171,7 +148,7 @@ export const DoomSlayer = GObject.registerClass(
             if (this._state === State.GLORY_KILL) {
                 if (--this._gloryDuration <= 0) this._pickNewAction();
                 this._updateAnimation();
-                this.actor?.set_position(Math.floor(this._x), Math.floor(this._y));
+                this._placeActor();
                 return;
             }
 
@@ -179,7 +156,7 @@ export const DoomSlayer = GObject.registerClass(
             if (this._state === State.SHOOTING) {
                 if (--this._shootDuration <= 0) this._pickNewAction();
                 this._updateAnimation();
-                this.actor?.set_position(Math.floor(this._x), Math.floor(this._y));
+                this._placeActor();
                 return;
             }
 

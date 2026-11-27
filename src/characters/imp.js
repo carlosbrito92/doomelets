@@ -34,6 +34,10 @@ export const Imp = GObject.registerClass(
             this._throwDurationMax  = 20;   // ticks que fica no estado THROWING
             this._currentTarget     = null;
 
+            // Idle: 'taunt' (provocar) só toca quando o manifesto do Imp tiver essa animação
+            this._idleVariants  = [{ name: 'taunt', weight: 1, cooldown: 400 }, { name: null, weight: 3 }];
+            this._stareReaction = 'taunt';
+
             // Callback para criar projétil no manager
             this._spawnProjectileCb = spawnProjectileCb ?? null;
         }
@@ -120,7 +124,7 @@ export const Imp = GObject.registerClass(
                 }
 
                 this._updateAnimation();
-                this.actor?.set_position(Math.floor(this._x), Math.floor(this._y));
+                this._placeActor();
                 return;
             }
 
