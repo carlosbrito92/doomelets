@@ -41,7 +41,7 @@
 <body>
 <header>
   <h1>Baron of Hell · Low Poly</h1>
-  <p>300 triângulos · sólidos de revolução arredondados · flat shading · textura 64×64 pintada por código · 270×480 sem suavização · vértices na grade · pontilhado Bayer · corte aberto com uma peça rotulada.</p>
+  <p>~1,5 mil triângulos · tubos e sólidos de revolução · flat shading · textura 64×64 pintada por código · 270×480 sem suavização · vértices na grade · pontilhado Bayer · corte aberto com uma peça rotulada.</p>
 </header>
 <main>
   <section class="stagecol">
@@ -69,7 +69,7 @@
     <div class="sec">
       <h2>Atlas 64×64 (pintado em código)</h2>
       <canvas id="atlas" width="64" height="64"></canvas>
-      <p class="hint">linha 1: pele · calça · linha 2: carne · osso · chifre · casco · linha 3: coração · olho · punho · mandíbula</p>
+      <p class="hint">4×4 células de 16 px: pele · cinza · rosa · chifre / casco · carne · osso · coração / olho · punho · focinho · órgão / intestino · pedra · boca · sobrancelha</p>
     </div>
     <div class="sec">
       <h2>Pipeline</h2>
@@ -87,22 +87,16 @@ import * as THREE from 'three';
 /* ================= parâmetros ================= */
 const W = 270, H = 480;        // resolução de render
 const CELL = 0.1;              // 1 célula da grade = 0.1 unidade
-const GRID = 0.5;               // vértices são arredondados para múltiplos de GRID células
-const BUDGET = 300;
-const LEVELS = 6;              // níveis por canal na quantização
+const GRID = 0.5;              // vértices são arredondados para múltiplos de GRID células
+const BUDGET = 1600;
+const LEVELS = 7;              // níveis por canal na quantização
 
-/* ================= textura 64×64 pintada em código ================= */
-const cells = {                // [x, y, w, h] dentro do atlas
-  skin :[0 , 0 ,32,32],
-  pants:[32, 0 ,32,32],
-  flesh:[0 ,32 ,16,16],
-  bone :[16,32 ,16,16],
-  horn :[32,32 ,16,16],
-  hoof :[48,32 ,16,16],
-  heart:[0 ,48 ,16,16],
-  eye  :[16,48 ,16,16],
-  fist :[32,48 ,16,16],
-  jaw  :[48,48 ,16,16],
+/* ================= textura 64×64 pintada em código (4×4 células de 16 px) ================= */
+const cells = {
+  skin :[0 ,0 ,16,16], gray :[16,0 ,16,16], pink :[32,0 ,16,16], horn :[48,0 ,16,16],
+  hoof :[0 ,16,16,16], flesh:[16,16,16,16], bone :[32,16,16,16], heart:[48,16,16,16],
+  eye  :[0 ,32,16,16], fist :[16,32,16,16], muzzle:[32,32,16,16], organ:[48,32,16,16],
+  gut  :[0 ,48,16,16], stone:[16,48,16,16], mouth:[32,48,16,16], brow :[48,48,16,16],
 };
 const atlas = document.createElement('canvas');
 atlas.width = atlas.height = 64;
@@ -115,209 +109,178 @@ function paint(name, fn){
   fn(put, w, h, rng(name.split('').reduce((a,c)=>a*31+c.charCodeAt(0),7)));
 }
 const pick = (pal,v)=>pal[clamp(Math.floor(v*pal.length),0,pal.length-1)];
+const noisy = (name, pal, f)=>paint(name,(put,w,h,r)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,f(x,y,r)));
+});
 
 const skinPal = ['#5c1014','#7e1a1c','#a02a2a','#c04444','#d86a60'];
+const skinFn = (x,y,r)=>.45+.26*Math.sin(y*.9+Math.sin(x*.5+1)*2.2)+.14*Math.sin(x*.7-y*.3)+(r()-.5)*.36;
 function skin(put,w,h,r){
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    const v = .45 + .26*Math.sin(y*.85+Math.sin(x*.4+1)*2.4) + .14*Math.sin(x*.55-y*.25) + (r()-.5)*.38;
-    put(x,y,pick(skinPal,v));
-  }
-  for(let i=0;i<6;i++){                       // veias
-    let x=r()*w|0, y=r()*h|0;
-    for(let k=0;k<11;k++){ put(x,y,'#3a0a10'); x+= r()<.5?1:0; y+= r()<.65?1:-1; }
-  }
-  for(let i=0;i<16;i++) put(r()*w|0, r()*h|0, '#e88a78');
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(skinPal,skinFn(x,y,r)));
+  for(let i=0;i<3;i++){ let x=r()*w|0, y=r()*h|0; for(let k=0;k<7;k++){ put(x,y,'#3a0a10'); x+= r()<.5?1:0; y+= r()<.65?1:-1; } }
+  for(let i=0;i<8;i++) put(r()*w|0, r()*h|0, '#e88a78');
 }
 paint('skin', skin);
-
-paint('pants',(put,w,h,r)=>{
-  const pal=['#3e2410','#5e3a1a','#7e5026','#9c6a34','#b88646'];
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    const v=.5+.3*Math.sin(x*.8+Math.sin(y*.4)*1.6)+.1*Math.sin(y*1.7)+(r()-.5)*.3;
-    put(x,y,pick(pal,v));
-  }
-  for(let i=0;i<4;i++){ const y=r()*h|0; for(let x=0;x<w;x+=2) put(x,y,'#2a180a'); }   // costura
+noisy('gray',['#4a4a56','#60606c','#787884','#9292a0'],(x,y,r)=>.45+.25*Math.sin(x*.6+y*.8)+(r()-.5)*.4);
+noisy('pink',['#9a4850','#b45a60','#cc7878','#e09a96'],(x,y,r)=>.5+.2*Math.sin(x*.9-y*.5)+(r()-.5)*.4);
+paint('horn',(put,w,h,r)=>{
+  const pal=['#1a1612','#383028','#6a5e4a','#9c917a','#c8bd9c'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ let v=y/(h-1)+(r()-.5)*.2; if(y%5===0) v-=.15; put(x,y,pick(pal,v)); }
 });
-
-paint('flesh',(put,w,h,r)=>{
-  const pal=['#5a1020','#82202e','#a8384a','#cc5c68','#e89091'];
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    const v=.4+.3*Math.sin(x*1.1+y*.7+Math.sin(y*.5)*2)+(r()-.5)*.4;
-    put(x,y,pick(pal,v));
-  }
-  for(let i=0;i<10;i++) put(r()*w|0,r()*h|0,'#e8b8b0');   // gordura
-});
-
+noisy('hoof',['#24160e','#38241a','#54382a','#72503a'],(x,y,r)=>.4+.2*Math.sin(x*1.1)+(r()-.5)*.5);
+noisy('flesh',['#4a0c16','#6e1424','#923040','#b45060','#d8808a'],(x,y,r)=>.4+.3*Math.sin(x*1.2+y*.8+Math.sin(y*.6)*2)+(r()-.5)*.4);
 paint('bone',(put,w,h,r)=>{
   const pal=['#8c8062','#b8ac88','#d8cfae','#ece4c8'];
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.55+(r()-.5)*.7+Math.sin(y*1.3)*.12));
-  for(let y=0;y<h;y+=4) for(let x=0;x<w;x++) put(x,y,'#6a5e44');   // vértebras
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.55+(r()-.5)*.6+Math.sin(y*1.4)*.12));
 });
-
-paint('horn',(put,w,h,r)=>{
-  const pal=['#15110e','#2e2620','#5e5240','#968a6c','#d2c6a2'];
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    let v = y/(h-1) + (r()-.5)*.22;
-    if(y%4===0) v-=.18;                                  // anéis
-    put(x,y,pick(pal,v));
-  }
-});
-
-paint('hoof',(put,w,h,r)=>{
-  const pal=['#08080a','#141418','#222230','#363648'];
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.35+(r()-.5)*.6+Math.sin(x*.9)*.15));
-});
-
 paint('heart',(put,w,h,r)=>{
   const pal=['#46060f','#760a17','#a81426','#d83446','#f0707a'];
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    const v=.45+.25*Math.sin(x*.9+y*.5)+(r()-.5)*.4;
-    put(x,y,pick(pal,v));
-  }
-  for(let i=0;i<3;i++){ let x=r()*w|0,y=0; for(;y<h;y++){ put(x,y,'#ffb0b8'); x+= r()<.4?(r()<.5?1:-1):0; } }
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.45+.25*Math.sin(x*1.1+y*.6)+(r()-.5)*.4));
+  for(let i=0;i<2;i++){ let x=r()*w|0; for(let y=0;y<h;y++){ put(x,y,'#ffb0b8'); x+= r()<.4?(r()<.5?1:-1):0; } }
 });
-
 paint('eye',(put,w,h)=>{
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){
     const d=Math.hypot(x-w/2+.5,y-h/2+.5);
-    put(x,y, d<3?'#fffbd0': d<5?'#ffe040': d<7?'#ff9a10':'#c03000');
+    put(x,y, d<2.5?'#fffbd0': d<4.5?'#ffe040': d<6.5?'#ff9a10':'#c03000');
   }
 });
-
 paint('fist',(put,w,h,r)=>{
   skin(put,w,h,r);
   const pal=['#2f9a2a','#58d040','#a4f070'];
-  for(let x=0;x<w;x++){                                  // gosma verde escorrendo
-    const len=2+(r()*6|0);
-    for(let y=0;y<len;y++) put(x,y,pick(pal,.2+(r()*.7)));
-  }
+  for(let x=0;x<w;x++){ const len=2+(r()*4|0); for(let y=0;y<len;y++) put(x,y,pick(pal,.2+r()*.7)); }
 });
-
-paint('jaw',(put,w,h,r)=>{                 // focinho: narinas + boca com presas
+paint('muzzle',(put,w,h,r)=>{
   const pal=['#8e3038','#a8444c','#c25c62','#d87a7a'];
   for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.5+(r()-.5)*.8+Math.sin(x*.7)*.1));
-  for(const nx of [3,10]) for(let dy=0;dy<2;dy++) for(let dx=0;dx<3;dx++) put(nx+dx,4+dy,'#2a050a');
-  for(let x=1;x<w-1;x++) put(x,10,'#2a050a');
-  for(let x=1;x<w-1;x++){ put(x,11,'#46080f'); if(x%3===1) { put(x,11,'#fff4d0'); put(x,12,'#c9bb8e'); } }
-  for(const tx of [1,14]) for(let y=7;y<14;y++) put(tx,y,y<12?'#fff4d0':'#c9bb8e');   // presas
+  for(const nx of [3,10]) for(let dy=0;dy<2;dy++) for(let dx=0;dx<3;dx++) put(nx+dx,5+dy,'#2a050a');
+  for(let x=2;x<w-2;x++) put(x,11,'#2a050a');
 });
+noisy('organ',['#3e1226','#5e1a34','#822a48','#a84a68','#d07a92'],(x,y,r)=>.45+.25*Math.sin(x*.8+y*.6)+(r()-.5)*.4);
+noisy('gut',['#b0506a','#c8708a','#de90a4','#f0b4c0'],(x,y,r)=>.5+.35*Math.sin(x*1.3)+(r()-.5)*.25);
+paint('stone',(put,w,h,r)=>{
+  const pal=['#463c34','#5a4e44','#706458','#867a6c'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.5+(r()-.5)*.6));
+});
+paint('mouth',(put,w,h,r)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(['#2a050a','#46080f','#6e1216'],.5+(r()-.5)*.9));
+  for(let x=0;x<w;x+=3) for(let y=0;y<5;y++) if(y<5-Math.abs(1-(x%3))*2) put(x,y,'#fff4d0');
+});
+noisy('brow',['#3e0c10','#5e1216','#7e1a1c','#962222'],(x,y,r)=>.4+.3*Math.sin(x*.8)+(r()-.5)*.4);
 
 const tex = new THREE.CanvasTexture(atlas);
 tex.magFilter = tex.minFilter = THREE.NearestFilter;
 tex.generateMipmaps = false;
 tex.colorSpace = THREE.SRGBColorSpace;
 
-/* ================= geometria (triângulos à mão, em células) ================= */
+/* ================= geometria: tubos varridos (sweep) ================= */
 const D2R = Math.PI/180;
 const snap = v => Math.round(v/GRID)*GRID || 0;
-const SG = [[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1],[-1,1,-1],[1,1,-1],[1,1,1],[-1,1,1]];
-const QUADS = { front:[3,2,6,7], back:[1,0,4,5], right:[2,1,5,6], left:[0,3,7,4], top:[7,6,5,4], bottom:[0,1,2,3] };
 const parts = [];
-let degenerate = 0;
-
+const V = (x,y,z)=>new THREE.Vector3(x,y,z);
 const area2 = (a,b,c)=>{
   const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
   return Math.hypot(u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]);
 };
-function push(name, cell, tris, quiet){
-  const ok = tris.filter(t=>{ const good = area2(...t) > 1e-6; if(!good && !quiet) degenerate++; return good; });
-  parts.push({name, cell, tris:ok});
-}
-/* caixa afunilada/rotacionada; tip = pirâmide; mirror = cópia em -x */
-function box(name, cell, c, s, o={}){
-  const top=o.top||[1,1], e=new THREE.Euler(...(o.rot||[0,0,0]).map(d=>d*D2R),'XYZ');
-  const pts = SG.map(([x,y,z])=>{
-    const k = y>0 ? top : [1,1];
-    const v = new THREE.Vector3(x*s[0]/2*k[0], y*s[1]/2, z*s[2]/2*k[1]);
-    if(o.tip && y>0){ v.x=0; v.z=0; }
-    v.applyEuler(e).add(new THREE.Vector3(...c));
-    return [snap(v.x),snap(v.y),snap(v.z)];
+/* path: [x,y,z,rx,rz?] — anéis perpendiculares ao caminho; n lados; UV cilíndrico por face.
+   cellAt(i,k) escolhe a célula por face; rx=rz=0 vira ápice; mirror copia em -x. */
+function sweep(name, cell, o){
+  const n=o.n||8, ph=(o.ph||0)*D2R, P=o.path, m=P.length-1;
+  const ref=V(...(o.ref||[1,0,0]));
+  const ctr=P.map(q=>V(q[0],q[1],q[2]));
+  const ring=P.map((q,i)=>{
+    const T=ctr[Math.min(m,i+1)].clone().sub(ctr[Math.max(0,i-1)]).normalize();
+    let U=ref.clone().addScaledVector(T,-ref.dot(T));
+    if(U.lengthSq()<1e-4) U=V(0,0,1).addScaledVector(T,-T.z);
+    U.normalize();
+    const Wv=new THREE.Vector3().crossVectors(U,T);
+    const rx=q[3], rz=q[4]===undefined?q[3]:q[4];
+    return Array.from({length:n},(_,k)=>{
+      const a=ph+k*2*Math.PI/n;
+      const v=ctr[i].clone().addScaledVector(U,rx*Math.cos(a)).addScaledVector(Wv,rz*Math.sin(a));
+      return [snap(v.x),snap(v.y),snap(v.z)];
+    });
   });
+  const mk=(a,b,c,uv,cn)=>{ const t=[a,b,c]; if(uv) t.uv=uv; t.cell=cn; return t; };
   const tris=[];
-  for(const [f,q] of Object.entries(QUADS)){
-    if(f==='top' && (o.noTop||o.tip)) continue;
-    if(f==='bottom' && o.noBottom) continue;
-    if(o.tip && f!=='bottom'){ tris.push([pts[q[0]],pts[q[1]],pts[q[2]]]); continue; }
-    tris.push([pts[q[0]],pts[q[1]],pts[q[2]]],[pts[q[0]],pts[q[2]],pts[q[3]]]);
-  }
-  push(name, cell, tris);
-  if(o.mirror) push(name+'_R', cell, tris.map(([a,b,c])=>[[-a[0],a[1],a[2]],[-c[0],c[1],c[2]],[-b[0],b[1],b[2]]]));
-}
-
-
-/* sólido de revolução: anéis [y, rx, rz, ox, oz] em ordem crescente; n lados; UV cilíndrico por face */
-function lathe(name, cell, o){
-  const n=o.n, ph=(o.ph||0)*D2R, R=o.rings, c=new THREE.Vector3(...(o.c||[0,0,0]));
-  const e=new THREE.Euler(...(o.rot||[0,0,0]).map(d=>d*D2R),'XYZ');
-  const ring=R.map(([y,rx,rz,ox=0,oz=0])=>Array.from({length:n},(_,k)=>{
-    const a=ph+k*2*Math.PI/n;
-    const v=new THREE.Vector3(rx*Math.cos(a)+ox, y, rz*Math.sin(a)+oz).applyEuler(e).add(c);
-    return [snap(v.x),snap(v.y),snap(v.z)];
-  }));
-  const mk=(a,b,c2,uv,cn)=>{ const t=[a,b,c2]; t.uv=uv; t.cell=cn; return t; };
-  const tris=[];
-  for(let i=0;i<R.length-1;i++){
-    const cn=(o.segCells&&o.segCells[i])||cell;
+  for(let i=0;i<m;i++){
+    const t0=o.gt?1-i/m:1, t1=o.gt?1-(i+1)/m:0;
     for(let k=0;k<n;k++){
+      const cn=o.cellAt?o.cellAt(i,k):((o.segCells&&o.segCells[i])||cell);
       const k1=(k+1)%n, s0=((2*k)%n)/n, s1=s0+2/n;
       const A=ring[i][k], B=ring[i+1][k], C=ring[i+1][k1], D=ring[i][k1];
-      tris.push(mk(A,B,C,[[s0,1],[s0,0],[s1,0]],cn), mk(A,C,D,[[s0,1],[s1,0],[s1,1]],cn));
+      tris.push(mk(A,B,C,[[s0,t0],[s0,t1],[s1,t1]],cn), mk(A,C,D,[[s0,t0],[s1,t1],[s1,t0]],cn));
     }
   }
-  const last=ring[ring.length-1], first=ring[0];
-  const capCell=o.capCell||cell;
-  if(o.capTop) for(let k=1;k<n-1;k++){ const t=[last[0],last[k+1],last[k]]; t.cell=capCell; tris.push(t); }
-  if(o.capBot) for(let k=1;k<n-1;k++){ const t=[first[0],first[k],first[k+1]]; t.cell=capCell; tris.push(t); }
+  const last=ring[m], first=ring[0], cc=o.capCell||cell;
+  if(o.capEnd)   for(let k=1;k<n-1;k++) tris.push(mk(last[0],last[k+1],last[k],null,cc));
+  if(o.capStart) for(let k=1;k<n-1;k++) tris.push(mk(first[0],first[k],first[k+1],null,cc));
   const good=tris.filter(t=>area2(...t)>1e-6);
-  push(name,cell,good,true);
-  if(o.mirror) push(name+'_R',cell,good.map(t=>{
-    const m=[[-t[0][0],t[0][1],t[0][2]],[-t[2][0],t[2][1],t[2][2]],[-t[1][0],t[1][1],t[1][2]]];
-    m.uv=t.uv&&[t.uv[0],t.uv[2],t.uv[1]]; m.cell=t.cell; return m;
-  }),true);
+  const group=o.group||'body';
+  parts.push({name,cell,group,tris:good});
+  if(o.mirror) parts.push({name:name+'_R',cell,group,tris:good.map(t=>{
+    const q=[[-t[0][0],t[0][1],t[0][2]],[-t[2][0],t[2][1],t[2][2]],[-t[1][0],t[1][1],t[1][2]]];
+    if(t.uv) q.uv=[t.uv[0],t.uv[2],t.uv[1]]; q.cell=t.cell; return q;
+  })});
 }
+const mir = p=>p.map(q=>[-q[0],...q.slice(1)]);
 
-/* ---- pernas: casco → canela → coxa (um sólido só, 6 lados) ---- */
-lathe('leg','pants',{n:6,mirror:true,
-  rings:[[0,6,6.5,6,2.5],[4,4.6,4.6,6,0],[13,6.2,6,6,.5],[25,7.4,7,6,0]],
-  segCells:['hoof','pants','pants']});
-/* ---- pelve e tronco em barril (8 lados), peito projetado para frente ---- */
-lathe('pelvis','pants',{n:8,rings:[[23,10.5,7],[31,10,7]]});
-lathe('torso','skin',{n:8,rings:[[31,10,7],[40,11.5,8,0,.5],[48,14.5,9,0,1.5],[53,10.5,7.5,0,2.5]]});
-/* ---- braços: punho → antebraço → deltoide, afinando num ápice ---- */
-lathe('arm','skin',{n:6,mirror:true,
-  rings:[[19,4.3,4.3,19.5,5],[25,6,6,19,4.5],[50,7,7,16.5,1.5],[55,0,0,16.5,1.5]],
-  segCells:['fist','skin','skin']});
-/* ---- cabeça: crânio inclinado para frente, focinho (eixo z), chifres e presas ---- */
-const SKULL=[[49.5,6.5,6,0,2.5],[54.5,8.5,7.2,0,3],[61,6,5.8,0,2.8]];
-lathe('skull','skin',{n:6,capTop:true,rings:SKULL});
-lathe('snout','skin',{n:6,c:[0,52.5,0],rot:[90,0,0],capTop:true,capCell:'jaw',
-  rings:[[4,3.8,3.4],[10.5,4.6,3.8],[14,4,3.2]]});
-lathe('horn','horn',{n:4,ph:45,mirror:true,rings:[[59,2.6,2.6,5.5,2.6],[62.5,2,2,9.5,2.6],[68,0,0,13,2.6]]});
-lathe('tusk','bone',{n:3,mirror:true,rings:[[48.5,1.2,1.2,3.4,11.5],[53,0,0,4,11.5]]});
-/* ---- interior (visível no corte) ---- */
-lathe('spine','bone',{n:3,ph:90,c:[-2.5,0,-4],rings:[[33,1.7,1.7],[57,1.7,1.7]]});
+/* ---- tronco em barril (12 lados): frente cinza, laterais e costas vermelhas ---- */
+sweep('torso','skin',{n:12,capStart:false,
+  path:[[0,24,0,10.5,7.5],[0,31,.6,11.5,8.5],[0,37,1.2,13,9.5],[0,44,1.3,14,9.5],[0,51,1.6,16,9.8],[0,56,2.6,13.5,8.5],[0,59.5,3.2,7,5.5]],
+  cellAt:(i,k)=>(i>=1&&i<=4&&k>=1&&k<=4)?'gray':'skin'});
+/* ---- pernas: coxa vermelha, canela cinza, casco marrom ---- */
+sweep('leg','gray',{n:8,mirror:true,
+  path:[[6.5,3,0,4.6],[6.5,8,.3,5],[6.5,13.5,1,5.8],[6.5,20,.3,7.3,7],[6.5,26,0,7.6,7.2]],
+  segCells:['gray','gray','skin','skin']});
+sweep('hoof','hoof',{n:8,mirror:true,
+  path:[[6.5,.5,2.2,5.8,6.6],[6.5,1.8,1.2,5.6,6.2],[6.5,3,0,4.6,4.6]]});
+/* ---- braços: punho (com gosma) → antebraço → bíceps → deltoide ---- */
+sweep('arm','skin',{n:8,mirror:true,capEnd:true,
+  path:[[19.5,15.5,7.2,0,0],[19.6,17.5,7.2,4.2,4.4],[19.6,22.5,6.8,6,6.2],[20,31,4.5,6.4,6.4],[21,42,1.5,7.2,7.2],[19.5,49,.5,8,8],[15.5,54.5,0,6,6]],
+  segCells:['fist','fist','skin','skin','skin','skin']});
 
-/* olhos: dois quads brilhantes acompanhando a face frontal inclinada do crânio */
-const frontZ=y=>{ for(let i=0;i<SKULL.length-1;i++){ const [y0,,rz0,,oz0=0]=SKULL[i],[y1,,rz1,,oz1=0]=SKULL[i+1];
-  if(y<=y1){ const t=(y-y0)/(y1-y0); return (oz0+.866*rz0)*(1-t)+(oz1+.866*rz1)*t; } } return 0; };
-const eyeTris=[];
-for(const sx of [-1,1]){
-  const xa=sx*1.3, xb=sx*3.5, y0=56, y1=58;
-  const q=(x,y)=>[x,y,snap(frontZ(y))+.5];
-  const A=q(Math.min(xa,xb),y0),B=q(Math.max(xa,xb),y0),C=q(Math.max(xa,xb),y1),Dd=q(Math.min(xa,xb),y1);
-  eyeTris.push([A,B,C],[A,C,Dd]);
-}
-const eyesPart = {name:'eyes', cell:'eye', tris:eyeTris};
+/* ---- cabeça de boi ---- */
+sweep('skull','skin',{n:10,capEnd:true,
+  path:[[0,57,3.5,5.5,5],[0,61.5,4.2,8,7.5],[0,66.5,4.5,8.8,8],[0,71,4,6.8,6.4]]});
+sweep('snout','pink',{n:8,capEnd:true,capCell:'muzzle',
+  path:[[0,60.5,6.5,4.6,4.2],[0,60.2,11.5,5.2,4.6],[0,59.8,15.5,4.4,3.8]]});
+sweep('jaw','pink',{n:6,capEnd:true,capCell:'mouth',
+  path:[[0,56.5,5.5,4.8,2.2],[0,55.8,11,4.4,2],[0,55.2,14,3.6,1.6]]});
+sweep('tusk','bone',{n:4,ph:45,mirror:true,
+  path:[[4.4,56.5,11.5,1.2],[5.2,60,13.5,.9],[4.8,63.5,14.2,0,0]]});
+sweep('ear','pink',{n:4,ph:45,mirror:true,ref:[0,0,1],
+  path:[[8.3,67,3,.9,2.6],[12.5,66.5,2.8,.9,3.2],[16,64,2,.7,2.2],[17.5,61.5,1.5,0,0]]});
+sweep('horn','horn',{n:6,mirror:true,gt:true,ref:[0,0,1],
+  path:[[7,68.5,4,3.2],[11.5,70.2,4,3],[15.5,73,3.8,2.5],[18,77,3.5,1.9],[18.6,81,3.8,1.2],[17.6,84.5,4.5,0,0]]});
+sweep('brow','brow',{n:4,ph:45,mirror:true,ref:[0,1,0],
+  path:[[1.2,66.2,12,1.2,1.2],[7.2,68.4,11,1.4,1.4]]});
+sweep('eye','eye',{n:6,mirror:true,group:'eyes',capEnd:true,ref:[1,0,0],
+  path:[[3.8,64.6,10,1.9,1.5],[3.8,64.4,11.6,1.5,1.2]]});
 
-/* coração: octaedro alongado, geometria relativa ao centro para poder pulsar */
-const HC=[-5,45,2];
-const heartPart=(()=>{ const T=[0,4,0],B=[0,-5,0],E=[4,0,0],N=[0,0,-4],Wv=[-4,0,0],S=[0,0,4];
-  return {name:'heart',cell:'heart',tris:[
-    [T,S,E],[T,E,N],[T,N,Wv],[T,Wv,S],
-    [B,E,S],[B,N,E],[B,Wv,N],[B,S,Wv]]}; })();
+/* ---- interior (aparece no corte) ---- */
+const spine=[]; for(let i=0;i<14;i++){ const t=i/13; spine.push([-2.6,27+i*2.9,-3.5-1.5*Math.sin(t*Math.PI),i%2?1.6:2.3]); }
+sweep('spine','bone',{n:6,group:'inner',path:spine});
+[[41,11.5],[44.5,12.5],[48,12.5],[51.5,11.5],[55,9.5]].forEach(([y0,R],ri)=>{
+  const path=[0.1,.33,.58,.8,.96].map(f=>{ const phi=f*Math.PI;
+    return [-2.6-(R-2.6)*Math.sin(phi), y0-3.5*f, 1.8-6.8*Math.cos(phi), .9]; });
+  sweep('rib'+ri,'bone',{n:4,ph:45,group:'inner',path});
+});
+sweep('sternum','bone',{n:4,ph:45,group:'inner',path:[[-2.2,40,8.8,1.4,.8],[-2.2,56,8.8,1.8,.8]]});
+sweep('lung','organ',{n:8,group:'inner',path:[[-9.5,43,-2.5,0,0],[-9.5,46,-2,4,4.2],[-9.5,51,-2,4.8,5],[-9.5,55.5,-2,3.4,3.8],[-9.5,57.5,-2,0,0]]});
+sweep('stomach','organ',{n:8,group:'inner',path:[[-6.5,32.5,2.5,0,0],[-6.5,34.5,3,3.8,3.4],[-6.5,38.5,3.2,4.6,4],[-6.5,41.5,3.2,0,0]]});
+const gut=[]; for(let i=0;i<10;i++){ const t=i*1.1; gut.push([-5.2+2.6*Math.cos(t),26.5+i*.75,1.2+2.2*Math.sin(t),1.7]); }
+sweep('gut','gut',{n:6,group:'inner',capStart:true,capEnd:true,path:gut});
+/* coração + aorta: grupo próprio para poder pulsar */
+sweep('heart','heart',{n:8,group:'heart',path:[[-5.2,43.5,2.2,0,0],[-5.2,45.5,2.5,3,2.8],[-5.2,49,2.7,4.4,4],[-5.2,52.5,2.7,3.2,3],[-5.2,54,2.7,0,0]]});
+sweep('aorta','heart',{n:6,group:'heart',capEnd:true,path:[[-4,52,2.7,1.5],[-3.2,57,3,1.4],[-2.4,58.5,0,1.2]]});
+const HC=[-5.2,48.5,2.6];
 
-/* ---- monta BufferGeometry com UV planar por parte, mapeada para a célula do atlas ---- */
-function buildGeo(list, forceCell){
+/* ---- pedestal ---- */
+sweep('plinth','stone',{n:8,ph:22.5,group:'plinth',capEnd:true,
+  path:[[0,-9,0,30],[0,-4,0,28.5],[0,0,0,26]]});
+
+/* ---- monta BufferGeometry: UV cilíndrico explícito (sweeps) ou planar por parte (tampas) ---- */
+function buildGeo(list, forceCell, center){
   const pos=[], uv=[];
   for(const p of list){
     const mn=[1e9,1e9,1e9], mx=[-1e9,-1e9,-1e9];
@@ -329,13 +292,14 @@ function buildGeo(list, forceCell){
       const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], w=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
       const n=[u[1]*w[2]-u[2]*w[1], u[2]*w[0]-u[0]*w[2], u[0]*w[1]-u[1]*w[0]].map(Math.abs);
       [a,b,c].forEach((v,vi)=>{
-        pos.push(v[0]*CELL, v[1]*CELL, v[2]*CELL);
+        const q=center?[v[0]-center[0],v[1]-center[1],v[2]-center[2]]:v;
+        pos.push(q[0]*CELL, q[1]*CELL, q[2]*CELL);
         let s,t;
         if(tri.uv){ [s,t]=tri.uv[vi]; }
-        else if(n[1]>=n[0] && n[1]>=n[2]){ s=nrm(v,0); t=nrm(v,2); }          // topo/base
-        else if(n[2]>=n[0])         { s=nrm(v,0); t=1-nrm(v,1); }        // frente/trás
-        else                        { s=nrm(v,2); t=1-nrm(v,1); }        // lados
-        uv.push((cx+1+s*(cw-2))/64, 1-(cy+1+t*(ch-2))/64);
+        else if(n[1]>=n[0] && n[1]>=n[2]){ s=nrm(v,0); t=nrm(v,2); }
+        else if(n[2]>=n[0])              { s=nrm(v,0); t=1-nrm(v,1); }
+        else                             { s=nrm(v,2); t=1-nrm(v,1); }
+        uv.push((cx+.5+s*(cw-1))/64, 1-(cy+.5+t*(ch-1))/64);
       });
     }
   }
@@ -361,7 +325,8 @@ const common = {flatShading:true, clippingPlanes:[clip]};
 const matOut  = snapPx(new THREE.MeshLambertMaterial({map:tex, ...common}));
 const matIn   = snapPx(new THREE.MeshLambertMaterial({map:tex, side:THREE.BackSide, emissive:0x2a0a10, ...common}));
 const matHeart= snapPx(new THREE.MeshLambertMaterial({map:tex, emissive:0x701820, ...common}));
-const matEye  = snapPx(new THREE.MeshBasicMaterial({map:tex, clippingPlanes:[clip], polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2}));
+const matEye  = snapPx(new THREE.MeshBasicMaterial({map:tex, clippingPlanes:[clip]}));
+const matPlinth = snapPx(new THREE.MeshLambertMaterial({map:tex, flatShading:true}));
 
 /* ================= cena ================= */
 const canvas = document.getElementById('view');
@@ -375,20 +340,21 @@ scene.add(new THREE.HemisphereLight(0xffe2c8, 0x3a1420, 1.7));
 const sun = new THREE.DirectionalLight(0xfff0d8, 2.6); sun.position.set(6,8,7); scene.add(sun);
 const rim = new THREE.DirectionalLight(0xff5a20, 1.1); rim.position.set(-6,3,-5); scene.add(rim);
 
-const bodyParts = parts;
-const geoOut = buildGeo(bodyParts);
-const geoIn  = buildGeo(bodyParts,'flesh');
-const body = new THREE.Mesh(geoOut, matOut);
-const inner = new THREE.Mesh(geoIn, matIn);
-const eyes = new THREE.Mesh(buildGeo([eyesPart]), matEye);
-const heart = new THREE.Mesh(buildGeo([heartPart]), matHeart);
+const grp = g=>parts.filter(p=>p.group===g);
+const geoBody=buildGeo(grp('body')), geoBodyIn=buildGeo(grp('body'),'flesh');
+const body  = new THREE.Mesh(geoBody, matOut);
+const inner = new THREE.Mesh(geoBodyIn, matIn);
+const organs= new THREE.Mesh(buildGeo(grp('inner')), matOut);
+const eyes  = new THREE.Mesh(buildGeo(grp('eyes')), matEye);
+const heart = new THREE.Mesh(buildGeo(grp('heart'),null,HC), matHeart);
+const plinth= new THREE.Mesh(buildGeo(grp('plinth')), matPlinth);
 heart.position.set(HC[0]*CELL, HC[1]*CELL, HC[2]*CELL);
-scene.add(body, inner, eyes, heart);
+scene.add(body, inner, organs, eyes, heart, plinth);
+const triCount=[body,organs,eyes,heart,plinth].reduce((n,m)=>n+m.geometry.attributes.position.count/3,0);
+const triBy=Object.fromEntries(['body','inner','eyes','heart','plinth'].map(g=>[g,grp(g).reduce((n,p)=>n+p.tris.length,0)]));
 
-const triCount = [geoOut,eyes.geometry,heart.geometry].reduce((n,g)=>n+g.attributes.position.count/3,0);
-
-const camera = new THREE.PerspectiveCamera(28, W/H, .5, 100);
-const TARGET = new THREE.Vector3(0,3.4,0);
+const camera = new THREE.PerspectiveCamera(28, W/H, .5, 200);
+const TARGET = new THREE.Vector3(0,3.9,0);
 
 /* render target baixo + pós-processo (quantização + Bayer) */
 const rt = new THREE.WebGLRenderTarget(W,H,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter,depthBuffer:true});
@@ -401,7 +367,7 @@ const post = new THREE.ShaderMaterial({
     void main(){
       vec4 s = texture2D(tDiffuse, vUv);
       vec3 bg = mix(vec3(.040,.010,.016), vec3(.004,.002,.003), vUv.y);
-      bg += vec3(.30,.060,.0) * smoothstep(.32,.0,vUv.y) * (1.-abs(vUv.x-.5)*1.2);   // brilho de lava no chão
+      bg += vec3(.30,.060,.0) * smoothstep(.32,.0,vUv.y) * (1.-abs(vUv.x-.5)*1.2);
       vec3 col = mix(bg, s.rgb, s.a);
       col = linearToOutputTexel(vec4(col,1.)).rgb;
       vec2 p = floor(gl_FragCoord.xy);
@@ -446,8 +412,8 @@ sync();
 $('atlas').getContext('2d').drawImage(atlas,0,0);
 $('stats').innerHTML = `
   <dt>triângulos</dt><dd class="${triCount<=BUDGET?'ok':''}">${triCount} / ${BUDGET}</dd>
-  <dt>degenerados</dt><dd>${degenerate}</dd>
-  <dt>textura</dt><dd>64×64 · nearest</dd>
+  <dt>por grupo</dt><dd>${Object.entries(triBy).map(([k,v])=>k+' '+v).join(' · ')}</dd>
+  <dt>textura</dt><dd>64×64 · 16 células · nearest</dd>
   <dt>render</dt><dd>${W}×${H}</dd>
   <dt>grade</dt><dd>${GRID} cél = ${GRID*CELL} u</dd>
   <dt>cores</dt><dd>${LEVELS}³ + Bayer 4×4</dd>
@@ -460,7 +426,7 @@ const t1=$('t1'), t2=$('t2');
 function frame(ms){
   const t = ms/1000;
   if(state.auto) state.az = 1.12 + .3*Math.sin(t*.45);
-  const d=19.5, el=.18;
+  const d=22, el=.16;
   camera.position.set(Math.sin(state.az)*Math.cos(el)*d, TARGET.y+Math.sin(el)*d, Math.cos(state.az)*Math.cos(el)*d);
   camera.lookAt(TARGET);
 
@@ -493,7 +459,11 @@ function frame(ms){
 }
 requestAnimationFrame(frame);
 
-window.__baron = {triCount, degenerate, state, parts};
+window.__baron = {triCount, triBy, state};
+</script>
+</body>
+</html>
+
 </script>
 </body>
 </html>
