@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Baron of Hell · Low Poly</title>
+<style>
+  :root{--bg:#15110f;--panel:#1d1815;--rule:#4a3a30;--ink:#e8dcc4;--soft:#9a8c78;--hot:#d8571a;--green:#6fb04a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}
+  h1{margin:0;font:800 26px/1 Impact,'Arial Narrow',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--hot)}
+  h2{margin:0 0 8px;font:700 11px/1 ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--soft)}
+  header{padding:14px 18px;border-bottom:1px solid var(--rule)}
+  header p{margin:4px 0 0;color:var(--soft)}
+  main{display:grid;grid-template-columns:minmax(320px,1fr) 340px;min-height:calc(100vh - 70px)}
+  @media(max-width:820px){main{grid-template-columns:1fr}}
+  .stagecol{padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;border-right:1px solid var(--rule)}
+  #wrap{position:relative;border:1px solid var(--rule);cursor:grab;touch-action:none;line-height:0;
+    width:min(92vw,calc((100vh - 190px) * 0.5625));min-width:270px;aspect-ratio:270/480;background:#000}
+  #wrap:active{cursor:grabbing}
+  #view{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;image-rendering:pixelated}
+  #lbl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transition:opacity .25s}
+  #lbl text{font:700 9px ui-monospace,Menlo,Consolas,monospace;fill:#ffe9a8;paint-order:stroke;stroke:#12090a;stroke-width:2.4px;letter-spacing:.04em}
+  #lbl text.sub{font-weight:400;font-size:7px;fill:#d8c79a}
+  #lbl polyline{fill:none;stroke:#ffe9a8;stroke-width:1;shape-rendering:crispEdges}
+  #lbl circle{fill:none;stroke:#ffe9a8;stroke-width:1}
+  .row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  button{font:inherit;color:var(--ink);background:#26201c;border:1px solid var(--rule);padding:6px 11px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase}
+  button:hover{border-color:var(--hot)}
+  button[aria-pressed=true]{background:var(--hot);border-color:var(--hot);color:#1a0d06;font-weight:700}
+  .side{padding:16px;background:var(--panel)}
+  .sec{border-top:1px solid var(--rule);padding-top:12px;margin-top:14px}
+  .sec:first-child{border-top:0;margin-top:0;padding-top:0}
+  #atlas{display:block;width:192px;height:192px;image-rendering:pixelated;border:1px solid var(--rule)}
+  dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
+  dt{color:var(--soft)} dd{margin:0}
+  .ok{color:var(--green)}
+  .hint{color:var(--soft);margin:8px 0 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Baron of Hell · Low Poly</h1>
+  <p>300 triângulos · flat shading · textura 64×64 pintada por código · 270×480 sem suavização · vértices na grade · pontilhado Bayer · corte aberto com uma peça rotulada.</p>
+</header>
+<main>
+  <section class="stagecol">
+    <div id="wrap">
+      <canvas id="view" width="270" height="480"></canvas>
+      <svg id="lbl" viewBox="0 0 270 480" preserveAspectRatio="none">
+        <polyline id="lead" points=""/>
+        <circle id="dot" r="3" cx="0" cy="0"/>
+        <text id="t1" x="263" y="22" text-anchor="end">CORAÇÃO</text>
+        <text id="t2" class="sub" x="263" y="32" text-anchor="end">bombeia lava</text>
+      </svg>
+    </div>
+    <div class="row">
+      <button id="bSlice" aria-pressed="true">Corte (S)</button>
+      <button id="bDither" aria-pressed="true">Dither (D)</button>
+      <button id="bWire" aria-pressed="false">Wire (W)</button>
+      <button id="bAuto" aria-pressed="true">Girar (A)</button>
+    </div>
+  </section>
+  <aside class="side">
+    <div class="sec">
+      <h2>Orçamento</h2>
+      <dl id="stats"></dl>
+    </div>
+    <div class="sec">
+      <h2>Atlas 64×64 (pintado em código)</h2>
+      <canvas id="atlas" width="64" height="64"></canvas>
+      <p class="hint">linha 1: pele · calça · linha 2: carne · osso · chifre · casco · linha 3: coração · olho · punho · mandíbula</p>
+    </div>
+    <div class="sec">
+      <h2>Pipeline</h2>
+      <p class="hint" style="margin-top:0">geometria → vértices arredondados na grade → render em 270×480 (nearest) → snap de vértice em pixel (estilo PS1) → quantização + Bayer 4×4 → ampliado sem filtro.<br>Arraste para girar.</p>
+    </div>
+  </aside>
+</main>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ================= parâmetros ================= */
+const W = 270, H = 480;        // resolução de render
+const CELL = 0.1;              // 1 célula da grade = 0.1 unidade
+const GRID = 1;                // vértices são arredondados para múltiplos de GRID células
+const BUDGET = 300;
+const LEVELS = 6;              // níveis por canal na quantização
+
+/* ================= textura 64×64 pintada em código ================= */
+const cells = {                // [x, y, w, h] dentro do atlas
+  skin :[0 , 0 ,32,32],
+  pants:[32, 0 ,32,32],
+  flesh:[0 ,32 ,16,16],
+  bone :[16,32 ,16,16],
+  horn :[32,32 ,16,16],
+  hoof :[48,32 ,16,16],
+  heart:[0 ,48 ,16,16],
+  eye  :[16,48 ,16,16],
+  fist :[32,48 ,16,16],
+  jaw  :[48,48 ,16,16],
+};
+const atlas = document.createElement('canvas');
+atlas.width = atlas.height = 64;
+const ag = atlas.getContext('2d');
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+function rng(seed){ let s = seed>>>0; return ()=> (s = (s*1664525 + 1013904223)>>>0) / 4294967296; }
+function paint(name, fn){
+  const [x0,y0,w,h] = cells[name];
+  const put = (x,y,c)=>{ ag.fillStyle=c; ag.fillRect(x0+((x%w)+w)%w, y0+((y%h)+h)%h, 1, 1); };
+  fn(put, w, h, rng(name.split('').reduce((a,c)=>a*31+c.charCodeAt(0),7)));
+}
+const pick = (pal,v)=>pal[clamp(Math.floor(v*pal.length),0,pal.length-1)];
+
+const skinPal = ['#5c1014','#7e1a1c','#a02a2a','#c04444','#d86a60'];
+function skin(put,w,h,r){
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const v = .45 + .26*Math.sin(y*.85+Math.sin(x*.4+1)*2.4) + .14*Math.sin(x*.55-y*.25) + (r()-.5)*.38;
+    put(x,y,pick(skinPal,v));
+  }
+  for(let i=0;i<6;i++){                       // veias
+    let x=r()*w|0, y=r()*h|0;
+    for(let k=0;k<11;k++){ put(x,y,'#3a0a10'); x+= r()<.5?1:0; y+= r()<.65?1:-1; }
+  }
+  for(let i=0;i<16;i++) put(r()*w|0, r()*h|0, '#e88a78');
+}
+paint('skin', skin);
+
+paint('pants',(put,w,h,r)=>{
+  const pal=['#3e2410','#5e3a1a','#7e5026','#9c6a34','#b88646'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const v=.5+.3*Math.sin(x*.8+Math.sin(y*.4)*1.6)+.1*Math.sin(y*1.7)+(r()-.5)*.3;
+    put(x,y,pick(pal,v));
+  }
+  for(let i=0;i<4;i++){ const y=r()*h|0; for(let x=0;x<w;x+=2) put(x,y,'#2a180a'); }   // costura
+});
+
+paint('flesh',(put,w,h,r)=>{
+  const pal=['#5a1020','#82202e','#a8384a','#cc5c68','#e89091'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const v=.4+.3*Math.sin(x*1.1+y*.7+Math.sin(y*.5)*2)+(r()-.5)*.4;
+    put(x,y,pick(pal,v));
+  }
+  for(let i=0;i<10;i++) put(r()*w|0,r()*h|0,'#e8b8b0');   // gordura
+});
+
+paint('bone',(put,w,h,r)=>{
+  const pal=['#8c8062','#b8ac88','#d8cfae','#ece4c8'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.55+(r()-.5)*.7+Math.sin(y*1.3)*.12));
+  for(let y=0;y<h;y+=4) for(let x=0;x<w;x++) put(x,y,'#6a5e44');   // vértebras
+});
+
+paint('horn',(put,w,h,r)=>{
+  const pal=['#15110e','#2e2620','#5e5240','#968a6c','#d2c6a2'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    let v = y/(h-1) + (r()-.5)*.22;
+    if(y%4===0) v-=.18;                                  // anéis
+    put(x,y,pick(pal,v));
+  }
+});
+
+paint('hoof',(put,w,h,r)=>{
+  const pal=['#08080a','#141418','#222230','#363648'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.35+(r()-.5)*.6+Math.sin(x*.9)*.15));
+});
+
+paint('heart',(put,w,h,r)=>{
+  const pal=['#46060f','#760a17','#a81426','#d83446','#f0707a'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const v=.45+.25*Math.sin(x*.9+y*.5)+(r()-.5)*.4;
+    put(x,y,pick(pal,v));
+  }
+  for(let i=0;i<3;i++){ let x=r()*w|0,y=0; for(;y<h;y++){ put(x,y,'#ffb0b8'); x+= r()<.4?(r()<.5?1:-1):0; } }
+});
+
+paint('eye',(put,w,h)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const d=Math.hypot(x-w/2+.5,y-h/2+.5);
+    put(x,y, d<3?'#fffbd0': d<5?'#ffe040': d<7?'#ff9a10':'#c03000');
+  }
+});
+
+paint('fist',(put,w,h,r)=>{
+  skin(put,w,h,r);
+  const pal=['#2f9a2a','#58d040','#a4f070'];
+  for(let x=0;x<w;x++){                                  // gosma verde escorrendo
+    const len=2+(r()*6|0);
+    for(let y=0;y<len;y++) put(x,y,pick(pal,.2+(r()*.7)));
+  }
+});
+
+paint('jaw',(put,w,h,r)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(['#2a050a','#46080f','#6e1216'],.5+(r()-.5)*.9));
+  for(let x=0;x<w;x++){                                  // dentes
+    const wid = 4;
+    for(let y=0;y<7;y++){
+      const half=(1+y*.55)/2, c=(Math.floor(x/wid)*wid)+wid/2-.5;
+      if(Math.abs(x-c)<=half) put(x,y, x<c?'#fff4d0':'#c9bb8e');
+    }
+  }
+});
+
+const tex = new THREE.CanvasTexture(atlas);
+tex.magFilter = tex.minFilter = THREE.NearestFilter;
+tex.generateMipmaps = false;
+tex.colorSpace = THREE.SRGBColorSpace;
+
+/* ================= geometria (triângulos à mão, em células) ================= */
+const D2R = Math.PI/180;
+const snap = v => Math.round(v/GRID)*GRID || 0;
+const SG = [[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1],[-1,1,-1],[1,1,-1],[1,1,1],[-1,1,1]];
+const QUADS = { front:[3,2,6,7], back:[1,0,4,5], right:[2,1,5,6], left:[0,3,7,4], top:[7,6,5,4], bottom:[0,1,2,3] };
+const parts = [];
+let degenerate = 0;
+
+const area2 = (a,b,c)=>{
+  const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+  return Math.hypot(u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]);
+};
+function push(name, cell, tris){
+  const ok = tris.filter(t=>{ const good = area2(...t) > 1e-6; if(!good) degenerate++; return good; });
+  parts.push({name, cell, tris:ok});
+}
+/* caixa afunilada/rotacionada; tip = pirâmide; mirror = cópia em -x */
+function box(name, cell, c, s, o={}){
+  const top=o.top||[1,1], e=new THREE.Euler(...(o.rot||[0,0,0]).map(d=>d*D2R),'XYZ');
+  const pts = SG.map(([x,y,z])=>{
+    const k = y>0 ? top : [1,1];
+    const v = new THREE.Vector3(x*s[0]/2*k[0], y*s[1]/2, z*s[2]/2*k[1]);
+    if(o.tip && y>0){ v.x=0; v.z=0; }
+    v.applyEuler(e).add(new THREE.Vector3(...c));
+    return [snap(v.x),snap(v.y),snap(v.z)];
+  });
+  const tris=[];
+  for(const [f,q] of Object.entries(QUADS)){
+    if(f==='top' && (o.noTop||o.tip)) continue;
+    if(f==='bottom' && o.noBottom) continue;
+    if(o.tip && f!=='bottom'){ tris.push([pts[q[0]],pts[q[1]],pts[q[2]]]); continue; }
+    tris.push([pts[q[0]],pts[q[1]],pts[q[2]]],[pts[q[0]],pts[q[2]],pts[q[3]]]);
+  }
+  push(name, cell, tris);
+  if(o.mirror) push(name+'_R', cell, tris.map(([a,b,c])=>[[-a[0],a[1],a[2]],[-c[0],c[1],c[2]],[-b[0],b[1],b[2]]]));
+}
+
+/* ---- pernas ---- */
+box('hoof' ,'hoof' ,[6,2,1.5] ,[8,4,11],{mirror:true});
+box('shin' ,'pants',[6,10,0]  ,[8,12,8],{mirror:true,top:[1.12,1.12]});
+box('thigh','pants',[6,21.5,0],[10,11,10],{mirror:true});
+/* ---- tronco ---- */
+box('pelvis' ,'pants',[0,29,0],[22,6,10]);
+box('belt'   ,'hoof' ,[0,32,0],[22,2,12]);
+box('abdomen','skin' ,[0,37,0],[14,8,10],{top:[1.15,1]});
+box('chest'  ,'skin' ,[0,47,0],[16,12,12],{top:[1.5,1.05]});
+/* ---- braços ---- */
+box('shoulder','skin',[15,50,0],[10,10,10],{mirror:true,rot:[0,0,-12]});
+box('upperarm','skin',[16,40,0],[8,12,8] ,{mirror:true});
+box('forearm' ,'skin',[17,30,2],[8,10,8] ,{mirror:true,rot:[-12,0,0]});
+box('fist'    ,'fist',[17,21,4],[8,8,8]  ,{mirror:true});
+/* ---- cabeça ---- */
+box('skull','skin',[0,58,0]  ,[12,10,12],{top:[.9,.95]});
+box('snout','skin',[0,56.5,8],[8,5,6]);
+box('jaw'  ,'jaw' ,[0,52.5,8],[8,3,6]);
+box('hornA','horn',[8,64,0]    ,[4,5,4],{mirror:true,rot:[0,0,-35],top:[.6,.6],noTop:true,noBottom:true});
+box('hornB','horn',[11.6,66.3,0],[3,5,3],{mirror:true,rot:[0,0,-60],tip:true,noBottom:true});
+/* ---- interior (visível no corte) ---- */
+box('spine','bone',[-2.5,45,-3.5],[3,24,3]);
+
+/* olhos: dois quads brilhantes colados na face do crânio */
+const eyeTris=[];
+for(const ex of [-3.5,3.5]){
+  const [x0,x1,y0,y1,z]=[ex-1.5,ex+1.5,59,61,6];
+  const A=[snap(x0),y0,z],B=[snap(x1),y0,z],C=[snap(x1),y1,z],Dd=[snap(x0),y1,z];
+  eyeTris.push([A,B,C],[A,C,Dd]);
+}
+const eyesPart = {name:'eyes', cell:'eye', tris:eyeTris};
+
+/* coração: octaedro alongado, geometria relativa ao centro para poder pulsar */
+const HC=[-5,46,1];
+{ const T=[0,4,0],B=[0,-5,0],E=[4,0,0],N=[0,0,-4],Wv=[-4,0,0],S=[0,0,4];
+  var heartPart={name:'heart',cell:'heart',tris:[
+    [T,S,E],[T,E,N],[T,N,Wv],[T,Wv,S],
+    [B,E,S],[B,N,E],[B,Wv,N],[B,S,Wv]]}; }
+
+/* ---- monta BufferGeometry com UV planar por parte, mapeada para a célula do atlas ---- */
+function buildGeo(list, forceCell){
+  const pos=[], uv=[];
+  for(const p of list){
+    const [cx,cy,cw,ch]=cells[forceCell||p.cell];
+    const mn=[1e9,1e9,1e9], mx=[-1e9,-1e9,-1e9];
+    for(const t of p.tris) for(const v of t) for(let i=0;i<3;i++){ mn[i]=Math.min(mn[i],v[i]); mx[i]=Math.max(mx[i],v[i]); }
+    const nrm=(v,i)=>{ const d=mx[i]-mn[i]; return d>1e-6?(v[i]-mn[i])/d:.5; };
+    for(const [a,b,c] of p.tris){
+      const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], w=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+      const n=[u[1]*w[2]-u[2]*w[1], u[2]*w[0]-u[0]*w[2], u[0]*w[1]-u[1]*w[0]].map(Math.abs);
+      for(const v of [a,b,c]){
+        pos.push(v[0]*CELL, v[1]*CELL, v[2]*CELL);
+        let s,t;
+        if(n[1]>=n[0] && n[1]>=n[2]){ s=nrm(v,0); t=nrm(v,2); }          // topo/base
+        else if(n[2]>=n[0])         { s=nrm(v,0); t=1-nrm(v,1); }        // frente/trás
+        else                        { s=nrm(v,2); t=1-nrm(v,1); }        // lados
+        uv.push((cx+1+s*(cw-2))/64, 1-(cy+1+t*(ch-2))/64);
+      }
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.computeVertexNormals();
+  return g;
+}
+
+/* ================= materiais: flat shading + snap de vértice em pixel ================= */
+const clip = new THREE.Plane(new THREE.Vector3(-1,0,0), 0);      // mantém x <= constant
+function snapPx(m){
+  m.onBeforeCompile = s=>{
+    s.vertexShader = s.vertexShader.replace('#include <project_vertex>',
+      `#include <project_vertex>
+       { const vec2 hr = vec2(${(W/2).toFixed(1)}, ${(H/2).toFixed(1)});
+         vec4 sp = gl_Position; sp.xy = floor(sp.xy/sp.w*hr + .5)/hr*sp.w; gl_Position = sp; }`);
+  };
+  return m;
+}
+const common = {flatShading:true, clippingPlanes:[clip]};
+const matOut  = snapPx(new THREE.MeshLambertMaterial({map:tex, ...common}));
+const matIn   = snapPx(new THREE.MeshLambertMaterial({map:tex, side:THREE.BackSide, emissive:0x2a0a10, ...common}));
+const matHeart= snapPx(new THREE.MeshLambertMaterial({map:tex, emissive:0x701820, ...common}));
+const matEye  = snapPx(new THREE.MeshBasicMaterial({map:tex, clippingPlanes:[clip], polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2}));
+
+/* ================= cena ================= */
+const canvas = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:false, alpha:false});
+renderer.setPixelRatio(1);
+renderer.setSize(W,H,false);
+renderer.localClippingEnabled = true;
+
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffe2c8, 0x3a1420, 1.7));
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.6); sun.position.set(6,8,7); scene.add(sun);
+const rim = new THREE.DirectionalLight(0xff5a20, 1.1); rim.position.set(-6,3,-5); scene.add(rim);
+
+const bodyParts = parts;
+const geoOut = buildGeo(bodyParts);
+const geoIn  = buildGeo(bodyParts,'flesh');
+const body = new THREE.Mesh(geoOut, matOut);
+const inner = new THREE.Mesh(geoIn, matIn);
+const eyes = new THREE.Mesh(buildGeo([eyesPart]), matEye);
+const heart = new THREE.Mesh(buildGeo([heartPart]), matHeart);
+heart.position.set(HC[0]*CELL, HC[1]*CELL, HC[2]*CELL);
+scene.add(body, inner, eyes, heart);
+
+const triCount = [geoOut,eyes.geometry,heart.geometry].reduce((n,g)=>n+g.attributes.position.count/3,0);
+
+const camera = new THREE.PerspectiveCamera(28, W/H, .5, 100);
+const TARGET = new THREE.Vector3(0,3.5,0);
+
+/* render target baixo + pós-processo (quantização + Bayer) */
+const rt = new THREE.WebGLRenderTarget(W,H,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter,depthBuffer:true});
+const post = new THREE.ShaderMaterial({
+  uniforms:{tDiffuse:{value:rt.texture}, uDither:{value:1}, uLevels:{value:LEVELS}},
+  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
+  fragmentShader:`
+    uniform sampler2D tDiffuse; uniform float uDither, uLevels; varying vec2 vUv;
+    const float M[16] = float[16](0.,8.,2.,10., 12.,4.,14.,6., 3.,11.,1.,9., 15.,7.,13.,5.);
+    void main(){
+      vec4 s = texture2D(tDiffuse, vUv);
+      vec3 bg = mix(vec3(.040,.010,.016), vec3(.004,.002,.003), vUv.y);
+      bg += vec3(.30,.060,.0) * smoothstep(.32,.0,vUv.y) * (1.-abs(vUv.x-.5)*1.2);   // brilho de lava no chão
+      vec3 col = mix(bg, s.rgb, s.a);
+      col = linearToOutputTexel(vec4(col,1.)).rgb;
+      vec2 p = floor(gl_FragCoord.xy);
+      float t = (M[int(mod(p.x,4.)) + 4*int(mod(p.y,4.))] + .5)/16. - .5;
+      float L = uLevels - 1.;
+      gl_FragColor = vec4(floor(col*L + .5 + t*uDither)/L, 1.);
+    }`,
+  depthTest:false, depthWrite:false
+});
+const postScene = new THREE.Scene();
+postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), post));
+const postCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+
+/* ================= interação ================= */
+const state = {slice:1, sliceT:1, dither:true, wire:false, auto:true, az:1.12};
+const $ = id=>document.getElementById(id);
+const sync = ()=>{
+  $('bSlice').setAttribute('aria-pressed',!!state.slice);
+  $('bDither').setAttribute('aria-pressed',state.dither);
+  $('bWire').setAttribute('aria-pressed',state.wire);
+  $('bAuto').setAttribute('aria-pressed',state.auto);
+  post.uniforms.uDither.value = state.dither?1:0;
+  matOut.wireframe = matIn.wireframe = matHeart.wireframe = matEye.wireframe = state.wire;
+};
+const act = {
+  S:()=>state.slice^=1, D:()=>state.dither=!state.dither,
+  W:()=>state.wire=!state.wire, A:()=>state.auto=!state.auto,
+};
+$('bSlice').onclick = ()=>{act.S();sync();};
+$('bDither').onclick= ()=>{act.D();sync();};
+$('bWire').onclick  = ()=>{act.W();sync();};
+$('bAuto').onclick  = ()=>{act.A();sync();};
+addEventListener('keydown',e=>{ const f=act[e.key.toUpperCase()]; if(f&&!e.ctrlKey&&!e.metaKey){f();sync();} });
+let drag=null;
+const wrap=$('wrap');
+wrap.addEventListener('pointerdown',e=>{drag=e.clientX; state.auto=false; sync(); wrap.setPointerCapture(e.pointerId);});
+wrap.addEventListener('pointermove',e=>{ if(drag!==null){ state.az -= (e.clientX-drag)*.012; drag=e.clientX; } });
+wrap.addEventListener('pointerup',()=>drag=null);
+sync();
+
+/* HUD */
+$('atlas').getContext('2d').drawImage(atlas,0,0);
+$('stats').innerHTML = `
+  <dt>triângulos</dt><dd class="${triCount<=BUDGET?'ok':''}">${triCount} / ${BUDGET}</dd>
+  <dt>degenerados</dt><dd>${degenerate}</dd>
+  <dt>textura</dt><dd>64×64 · nearest</dd>
+  <dt>render</dt><dd>${W}×${H}</dd>
+  <dt>grade</dt><dd>${GRID} cél = ${GRID*CELL} u</dd>
+  <dt>cores</dt><dd>${LEVELS}³ + Bayer 4×4</dd>
+  <dt>sombreamento</dt><dd>flat</dd>`;
+
+/* ================= loop ================= */
+const v3 = new THREE.Vector3();
+const lead=$('lead'), dot=$('dot'), lbl=$('lbl');
+const t1=$('t1'), t2=$('t2');
+function frame(ms){
+  const t = ms/1000;
+  if(state.auto) state.az = 1.12 + .3*Math.sin(t*.45);
+  const d=15.6, el=.18;
+  camera.position.set(Math.sin(state.az)*Math.cos(el)*d, TARGET.y+Math.sin(el)*d, Math.cos(state.az)*Math.cos(el)*d);
+  camera.lookAt(TARGET);
+
+  state.sliceT += (state.slice - state.sliceT)*.12;
+  clip.constant = (1-state.sliceT)*3.2;
+  inner.visible = state.sliceT > .01;
+
+  const beat = Math.pow(Math.max(0,Math.sin(t*Math.PI*2*1.11)),6);
+  heart.scale.setScalar(1 + .14*beat);
+
+  renderer.setRenderTarget(rt);
+  renderer.setClearColor(0x000000,0);
+  renderer.clear();
+  renderer.render(scene,camera);
+  renderer.setRenderTarget(null);
+  renderer.render(postScene,postCam);
+
+  // rótulo: ponta do coração projetada na tela
+  const show = state.sliceT>.97 && Math.sin(state.az)>.6;
+  lbl.style.opacity = show?1:0;
+  if(show){
+    v3.copy(heart.position).project(camera);
+    const hx=(v3.x*.5+.5)*W, hy=(1-(v3.y*.5+.5))*H;
+    const ly = Math.round(hy);
+    t1.setAttribute('y', ly-14); t2.setAttribute('y', ly-5);
+    lead.setAttribute('points',`263,${ly+1} ${(hx+4).toFixed(1)},${ly+1}`);
+    dot.setAttribute('cx',hx.toFixed(1)); dot.setAttribute('cy',hy.toFixed(1));
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+window.__baron = {triCount, degenerate, state, parts};
+</script>
+</body>
+</html>
