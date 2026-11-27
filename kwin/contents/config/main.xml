@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="">
+    <entry name="Count" type="int">
+      <default>5</default>
+    </entry>
+    <entry name="Scale" type="int">
+      <default>64</default>
+    </entry>
+    <entry name="JumpPower" type="int">
+      <default>20</default>
+    </entry>
+    <entry name="SpawnOffset" type="int">
+      <default>0</default>
+    </entry>
+    <entry name="AllowInteraction" type="bool">
+      <default>false</default>
+    </entry>
+    <entry name="WalkOnPanels" type="bool">
+      <default>true</default>
+    </entry>
+    <entry name="FloorZOrder" type="int">
+      <default>0</default>
+    </entry>
+    <entry name="TypeDoomSlayer" type="bool">
+      <default>true</default>
+    </entry>
+    <entry name="TypeImp" type="bool">
+      <default>true</default>
+    </entry>
+    <entry name="TypeCacodemon" type="bool">
+      <default>true</default>
+    </entry>
+    <entry name="TypeKitten" type="bool">
+      <default>false</default>
+    </entry>
+    <entry name="TypeMouse" type="bool">
+      <default>false</default>
+    </entry>
+    <entry name="TypePuppy" type="bool">
+      <default>false</default>
+    </entry>
+    <entry name="TypeSanta" type="bool">
+      <default>false</default>
+    </entry>
+    <entry name="TypeSquirrel" type="bool">
+      <default>false</default>
+    </entry>
+    <entry name="TypeTux" type="bool">
+      <default>false</default>
+    </entry>
+  </group>
+</kcfg>

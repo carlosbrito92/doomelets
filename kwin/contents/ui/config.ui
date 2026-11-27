@@ -1,0 +1,211 @@
+<?xml version="1.0" ?>
+<ui version="4.0">
+ <class>DoomeletsConfigForm</class>
+ <widget class="QWidget" name="DoomeletsConfigForm">
+  <property name="windowTitle">
+   <string>Doomelets</string>
+  </property>
+  <layout class="QFormLayout" name="formLayout">
+   <item row="0" column="0">
+    <widget class="QLabel">
+     <property name="text">
+      <string>Characters on screen:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QSpinBox" name="kcfg_Count">
+     <property name="minimum">
+      <number>0</number>
+     </property>
+     <property name="maximum">
+      <number>50</number>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel">
+     <property name="text">
+      <string>Character height:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QSpinBox" name="kcfg_Scale">
+     <property name="minimum">
+      <number>16</number>
+     </property>
+     <property name="maximum">
+      <number>512</number>
+     </property>
+     <property name="suffix">
+      <string> px</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel">
+     <property name="text">
+      <string>Jump power:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1">
+    <widget class="QSpinBox" name="kcfg_JumpPower">
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>60</number>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel">
+     <property name="text">
+      <string>Spawn offset from top:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="1">
+    <widget class="QSpinBox" name="kcfg_SpawnOffset">
+     <property name="minimum">
+      <number>0</number>
+     </property>
+     <property name="maximum">
+      <number>2000</number>
+     </property>
+     <property name="suffix">
+      <string> px</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QLabel">
+     <property name="text">
+      <string>In front of maximized windows:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="1">
+    <widget class="QComboBox" name="kcfg_FloorZOrder">
+     <item>
+      <property name="text">
+       <string>Always in front</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Behind when the focused window is maximized</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Behind when any window is maximized</string>
+      </property>
+     </item>
+    </widget>
+   </item>
+   <item row="5" column="1">
+    <widget class="QCheckBox" name="kcfg_WalkOnPanels">
+     <property name="text">
+      <string>Walk on Plasma panels</string>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="1">
+    <widget class="QCheckBox" name="kcfg_AllowInteraction">
+     <property name="text">
+      <string>Allow dragging characters with the mouse</string>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="0">
+    <widget class="QLabel">
+     <property name="text">
+      <string>Characters:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="1">
+    <layout class="QGridLayout">
+     <item row="0" column="0">
+      <widget class="QCheckBox" name="kcfg_TypeDoomSlayer">
+       <property name="text">
+        <string>Doom Slayer (always exactly one)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QCheckBox" name="kcfg_TypeImp">
+       <property name="text">
+        <string>Imp</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="2">
+      <widget class="QCheckBox" name="kcfg_TypeCacodemon">
+       <property name="text">
+        <string>Cacodemon</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QCheckBox" name="kcfg_TypeKitten">
+       <property name="text">
+        <string>Kitten</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QCheckBox" name="kcfg_TypeMouse">
+       <property name="text">
+        <string>Mouse</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="2">
+      <widget class="QCheckBox" name="kcfg_TypePuppy">
+       <property name="text">
+        <string>Puppy</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0">
+      <widget class="QCheckBox" name="kcfg_TypeSanta">
+       <property name="text">
+        <string>Santa</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QCheckBox" name="kcfg_TypeSquirrel">
+       <property name="text">
+        <string>Squirrel</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="2">
+      <widget class="QCheckBox" name="kcfg_TypeTux">
+       <property name="text">
+        <string>Tux</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="8" column="0" colspan="2">
+    <widget class="QLabel">
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+     <property name="text">
+      <string>Shortcuts: Meta+Ctrl+D shows or hides the characters, Meta+Ctrl+R respawns them (change them in System Settings → Keyboard → Shortcuts → KWin).</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
