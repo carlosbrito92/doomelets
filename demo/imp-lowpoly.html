@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Imp · Low Poly</title>
+<style>
+  :root{--bg:#15110f;--panel:#1d1815;--rule:#4a3a30;--ink:#e8dcc4;--soft:#9a8c78;--hot:#d8571a;--green:#6fb04a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}
+  h1{margin:0;font:800 26px/1 Impact,'Arial Narrow',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--hot)}
+  h2{margin:0 0 8px;font:700 11px/1 ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--soft)}
+  header{padding:14px 18px;border-bottom:1px solid var(--rule)}
+  header p{margin:4px 0 0;color:var(--soft)}
+  main{display:grid;grid-template-columns:minmax(320px,1fr) 340px;min-height:calc(100vh - 70px)}
+  @media(max-width:820px){main{grid-template-columns:1fr}}
+  .stagecol{padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;border-right:1px solid var(--rule)}
+  #wrap{position:relative;border:1px solid var(--rule);cursor:grab;touch-action:none;line-height:0;
+    width:min(92vw,calc((100vh - 190px) * 0.5625));min-width:270px;aspect-ratio:270/480;background:#000}
+  #wrap:active{cursor:grabbing}
+  #view{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;image-rendering:pixelated}
+  #lbl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transition:opacity .25s}
+  #lbl text{font:700 9px ui-monospace,Menlo,Consolas,monospace;fill:#ffe9a8;paint-order:stroke;stroke:#12090a;stroke-width:2.4px;letter-spacing:.04em}
+  #lbl text.sub{font-weight:400;font-size:7px;fill:#d8c79a}
+  #lbl polyline{fill:none;stroke:#ffe9a8;stroke-width:1;shape-rendering:crispEdges}
+  #lbl circle{fill:none;stroke:#ffe9a8;stroke-width:1}
+  .row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  button{font:inherit;color:var(--ink);background:#26201c;border:1px solid var(--rule);padding:6px 11px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase}
+  button:hover{border-color:var(--hot)}
+  button[aria-pressed=true]{background:var(--hot);border-color:var(--hot);color:#1a0d06;font-weight:700}
+  .side{padding:16px;background:var(--panel)}
+  .sec{border-top:1px solid var(--rule);padding-top:12px;margin-top:14px}
+  .sec:first-child{border-top:0;margin-top:0;padding-top:0}
+  #atlas{display:block;width:192px;height:192px;image-rendering:pixelated;border:1px solid var(--rule)}
+  dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
+  dt{color:var(--soft)} dd{margin:0}
+  .ok{color:var(--green)}
+  .hint{color:var(--soft);margin:8px 0 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Imp · Low Poly</h1>
+  <p>~1,5 mil triângulos · tubos e sólidos de revolução · flat shading · textura 64×64 pintada por código · 270×480 sem suavização · vértices na grade · pontilhado Bayer · corte aberto com uma peça rotulada.</p>
+</header>
+<main>
+  <section class="stagecol">
+    <div id="wrap">
+      <canvas id="view" width="270" height="480"></canvas>
+      <svg id="lbl" viewBox="0 0 270 480" preserveAspectRatio="none">
+        <polyline id="lead" points=""/>
+        <circle id="dot" r="3" cx="0" cy="0"/>
+        <text id="t1" x="263" y="22" text-anchor="end">GLÂNDULA DE FOGO</text>
+        <text id="t2" class="sub" x="263" y="32" text-anchor="end">fabrica bolas de fogo</text>
+      </svg>
+    </div>
+    <div class="row">
+      <button id="bSlice" aria-pressed="true">Corte (S)</button>
+      <button id="bDither" aria-pressed="true">Dither (D)</button>
+      <button id="bWire" aria-pressed="false">Wire (W)</button>
+      <button id="bAuto" aria-pressed="true">Girar (A)</button>
+    </div>
+  </section>
+  <aside class="side">
+    <div class="sec">
+      <h2>Orçamento</h2>
+      <dl id="stats"></dl>
+    </div>
+    <div class="sec">
+      <h2>Atlas 64×64 (pintado em código)</h2>
+      <canvas id="atlas" width="64" height="64"></canvas>
+      <p class="hint">4×4 células de 16 px: pele · barriga · couro · espinho / garra · carne · osso · brasa / olho · chama · rosto · órgão / intestino · pedra · boca · sobrancelha</p>
+    </div>
+    <div class="sec">
+      <h2>Pipeline</h2>
+      <p class="hint" style="margin-top:0">geometria → vértices arredondados na grade → render em 270×480 (nearest) → snap de vértice em pixel (estilo PS1) → quantização + Bayer 4×4 → ampliado sem filtro.<br>Arraste para girar.</p>
+    </div>
+  </aside>
+</main>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ================= parâmetros ================= */
+const W = 270, H = 480;        // resolução de render
+const CELL = 0.1;              // 1 célula da grade = 0.1 unidade
+const GRID = 0.5;              // vértices são arredondados para múltiplos de GRID células
+const BUDGET = 1600;
+const LEVELS = 7;              // níveis por canal na quantização
+
+/* ================= textura 64×64 pintada em código (4×4 células de 16 px) ================= */
+const cells = {
+  skin :[0 ,0 ,16,16], gray :[16,0 ,16,16], pink :[32,0 ,16,16], horn :[48,0 ,16,16],
+  hoof :[0 ,16,16,16], flesh:[16,16,16,16], bone :[32,16,16,16], heart:[48,16,16,16],
+  eye  :[0 ,32,16,16], fist :[16,32,16,16], muzzle:[32,32,16,16], organ:[48,32,16,16],
+  gut  :[0 ,48,16,16], stone:[16,48,16,16], mouth:[32,48,16,16], brow :[48,48,16,16],
+};
+const atlas = document.createElement('canvas');
+atlas.width = atlas.height = 64;
+const ag = atlas.getContext('2d');
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+function rng(seed){ let s = seed>>>0; return ()=> (s = (s*1664525 + 1013904223)>>>0) / 4294967296; }
+function paint(name, fn){
+  const [x0,y0,w,h] = cells[name];
+  const put = (x,y,c)=>{ ag.fillStyle=c; ag.fillRect(x0+((x%w)+w)%w, y0+((y%h)+h)%h, 1, 1); };
+  fn(put, w, h, rng(name.split('').reduce((a,c)=>a*31+c.charCodeAt(0),7)));
+}
+const pick = (pal,v)=>pal[clamp(Math.floor(v*pal.length),0,pal.length-1)];
+const noisy = (name, pal, f)=>paint(name,(put,w,h,r)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,f(x,y,r)));
+});
+
+const skinPal = ['#3a1e12','#5a3420','#7a4a2c','#9a6238','#b87c48'];
+const skinFn = (x,y,r)=>.45+.22*Math.sin(y*.8+Math.sin(x*.6+1)*2)+.12*Math.sin(x*.9-y*.4)+(r()-.5)*.42;
+function skin(put,w,h,r){
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(skinPal,skinFn(x,y,r)));
+  for(let i=0;i<3;i++){ let x=r()*w|0, y=r()*h|0; for(let k=0;k<5;k++){ put(x,y,'#22100a'); x+= r()<.6?1:0; y+= r()<.5?1:0; } }   // cicatrizes
+  for(let i=0;i<7;i++) put(r()*w|0, r()*h|0, '#d89a64');
+}
+paint('skin', skin);
+noisy('gray',['#8a6642','#a67e52','#c49a68','#dcb888'],(x,y,r)=>.5+.25*Math.sin(y*1.3+x*.3)+(r()-.5)*.35);          // barriga clara
+noisy('pink',['#241410','#382016','#4c2c1e','#603a28'],(x,y,r)=>.45+.25*Math.sin(x*.9+y*.6)+(r()-.5)*.4);           // couro escuro
+paint('horn',(put,w,h,r)=>{
+  const pal=['#3a2c20','#6a5a44','#a89878','#d8ccac','#f0e8cc'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ let v=y/(h-1)+(r()-.5)*.18; if(y%5===0) v-=.12; put(x,y,pick(pal,v)); }
+});
+noisy('hoof',['#1a1008','#2a1a10','#42281a','#5c3a26'],(x,y,r)=>.4+.2*Math.sin(x*1.1)+(r()-.5)*.5);
+noisy('flesh',['#4a1a10','#6e2a1a','#92402a','#b4604a','#d8907a'],(x,y,r)=>.4+.3*Math.sin(x*1.2+y*.8+Math.sin(y*.6)*2)+(r()-.5)*.4);
+paint('bone',(put,w,h,r)=>{
+  const pal=['#8c8062','#b8ac88','#d8cfae','#ece4c8'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.55+(r()-.5)*.6+Math.sin(y*1.4)*.12));
+});
+paint('heart',(put,w,h,r)=>{                   // brasa: glândula de fogo
+  const pal=['#6a0c00','#b82800','#ff5a10','#ffa830','#fff0a0'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.5+.3*Math.sin(x*.9+y*.7)+(r()-.5)*.5));
+});
+paint('eye',(put,w,h)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const d=Math.hypot(x-w/2+.5,y-h/2+.5);
+    put(x,y, d<2.5?'#ffffff': d<4.5?'#fff0a0': d<6.5?'#ffc830':'#e06000');
+  }
+});
+paint('fist',(put,w,h,r)=>{                    // bola de fogo
+  const pal=['#c02800','#ff6010','#ffa020','#ffe060','#fffbd0'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const d=Math.hypot(x-w/2,y-h/2)/(w/2); put(x,y,pick(pal,1-d*.8+(r()-.5)*.35)); }
+});
+paint('muzzle',(put,w,h,r)=>{                  // rosto: narinas em fenda, boca larga com presas
+  const pal=['#7a4a2c','#9a6238','#b87c48','#cc9460'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.5+(r()-.5)*.8));
+  for(const nx of [4,10]) for(let dy=0;dy<3;dy++) put(nx+1,3+dy,'#22100a');
+  for(let x=1;x<w-1;x++){ put(x,9,'#22100a'); put(x,10,'#3a0a08'); }
+  for(let x=2;x<w-2;x+=3){ put(x,11,'#f0e8cc'); put(x,12,'#c8bc9c'); }
+});
+noisy('organ',['#4a1a1a','#6a2a28','#8a403a','#aa6050','#cc8470'],(x,y,r)=>.45+.25*Math.sin(x*.8+y*.6)+(r()-.5)*.4);
+noisy('gut',['#a85a44','#c47860','#dc9a80','#f0bca0'],(x,y,r)=>.5+.35*Math.sin(x*1.3)+(r()-.5)*.25);
+paint('stone',(put,w,h,r)=>{
+  const pal=['#3a2a22','#4e3a2e','#644c3c','#7a604c'];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(pal,.5+(r()-.5)*.6));
+});
+paint('mouth',(put,w,h,r)=>{
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) put(x,y,pick(['#2a0806','#46100c','#6e1c14'],.5+(r()-.5)*.9));
+  for(let x=0;x<w;x+=3) for(let y=0;y<5;y++) if(y<5-Math.abs(1-(x%3))*2) put(x,y,'#f0e8cc');
+});
+noisy('brow',['#22100a','#3a1e12','#5a3420','#7a4a2c'],(x,y,r)=>.4+.3*Math.sin(x*.8)+(r()-.5)*.4);
+
+const tex = new THREE.CanvasTexture(atlas);
+tex.magFilter = tex.minFilter = THREE.NearestFilter;
+tex.generateMipmaps = false;
+tex.colorSpace = THREE.SRGBColorSpace;
+
+/* ================= geometria: tubos varridos (sweep) ================= */
+const D2R = Math.PI/180;
+const snap = v => Math.round(v/GRID)*GRID || 0;
+const parts = [];
+const V = (x,y,z)=>new THREE.Vector3(x,y,z);
+const area2 = (a,b,c)=>{
+  const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+  return Math.hypot(u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]);
+};
+/* path: [x,y,z,rx,rz?] — anéis perpendiculares ao caminho; n lados; UV cilíndrico por face.
+   cellAt(i,k) escolhe a célula por face; rx=rz=0 vira ápice; mirror copia em -x. */
+function sweep(name, cell, o){
+  const n=o.n||8, ph=(o.ph||0)*D2R, P=o.path, m=P.length-1;
+  const ref=V(...(o.ref||[1,0,0]));
+  const ctr=P.map(q=>V(q[0],q[1],q[2]));
+  const ring=P.map((q,i)=>{
+    const T=ctr[Math.min(m,i+1)].clone().sub(ctr[Math.max(0,i-1)]).normalize();
+    let U=ref.clone().addScaledVector(T,-ref.dot(T));
+    if(U.lengthSq()<1e-4) U=V(0,0,1).addScaledVector(T,-T.z);
+    U.normalize();
+    const Wv=new THREE.Vector3().crossVectors(U,T);
+    const rx=q[3], rz=q[4]===undefined?q[3]:q[4];
+    return Array.from({length:n},(_,k)=>{
+      const a=ph+k*2*Math.PI/n;
+      const v=ctr[i].clone().addScaledVector(U,rx*Math.cos(a)).addScaledVector(Wv,rz*Math.sin(a));
+      return [snap(v.x),snap(v.y),snap(v.z)];
+    });
+  });
+  const mk=(a,b,c,uv,cn)=>{ const t=[a,b,c]; if(uv) t.uv=uv; t.cell=cn; return t; };
+  const tris=[];
+  for(let i=0;i<m;i++){
+    const t0=o.gt?1-i/m:1, t1=o.gt?1-(i+1)/m:0;
+    for(let k=0;k<n;k++){
+      const cn=o.cellAt?o.cellAt(i,k):((o.segCells&&o.segCells[i])||cell);
+      const k1=(k+1)%n, s0=((2*k)%n)/n, s1=s0+2/n;
+      const A=ring[i][k], B=ring[i+1][k], C=ring[i+1][k1], D=ring[i][k1];
+      tris.push(mk(A,B,C,[[s0,t0],[s0,t1],[s1,t1]],cn), mk(A,C,D,[[s0,t0],[s1,t1],[s1,t0]],cn));
+    }
+  }
+  const last=ring[m], first=ring[0], cc=o.capCell||cell;
+  if(o.capEnd)   for(let k=1;k<n-1;k++) tris.push(mk(last[0],last[k+1],last[k],null,cc));
+  if(o.capStart) for(let k=1;k<n-1;k++) tris.push(mk(first[0],first[k],first[k+1],null,cc));
+  const good=tris.filter(t=>area2(...t)>1e-6);
+  const group=o.group||'body';
+  parts.push({name,cell,group,tris:good});
+  if(o.mirror) parts.push({name:name+'_R',cell,group,tris:good.map(t=>{
+    const q=[[-t[0][0],t[0][1],t[0][2]],[-t[2][0],t[2][1],t[2][2]],[-t[1][0],t[1][1],t[1][2]]];
+    if(t.uv) q.uv=[t.uv[0],t.uv[2],t.uv[1]]; q.cell=t.cell; return q;
+  })});
+}
+const mir = p=>p.map(q=>[-q[0],...q.slice(1)]);
+
+/* ---- perfis do tronco (curvado para frente) usados também para posicionar o interior ---- */
+const lerpAt=(tbl,y)=>{ for(let i=0;i<tbl.length-1;i++){ const [y0,v0]=tbl[i],[y1,v1]=tbl[i+1];
+  if(y<=y1) return v0+(v1-v0)*clamp((y-y0)/(y1-y0),0,1); } return tbl[tbl.length-1][1]; };
+const ZC=[[26,-1],[32,0],[38,2],[44,4],[49,5.5],[52,6.5]];
+const RX=[[26,7],[32,7.5],[38,9],[44,10.5],[49,9],[52,5]];
+const RZ=[[26,5.5],[32,6],[38,6.8],[44,7.2],[49,6.2],[52,4.5]];
+const zc=y=>lerpAt(ZC,y), trx=y=>lerpAt(RX,y), trz=y=>lerpAt(RZ,y);
+const spike=(name,a,b,r,o={})=>sweep(name,'horn',{n:o.n||5,mirror:o.mirror,gt:true,ref:[0,0,1],path:[[...a,r],[...b,0,0]]});
+
+/* ---- tronco magro e curvado: barriga clara na frente ---- */
+sweep('torso','skin',{n:10,
+  path:[[0,26,-1,7,5.5],[0,32,0,7.5,6],[0,38,2,9,6.8],[0,44,4,10.5,7.2],[0,49,5.5,9,6.2],[0,52,6.5,5,4.5],[0,56,8,3.4,3.2]],
+  cellAt:(i,k)=>(i<=3&&k>=1&&k<=3)?'gray':'skin'});
+/* ---- pernas agachadas com pé de garras ---- */
+sweep('leg','skin',{n:8,mirror:true,
+  path:[[5.5,4,-1,3,3],[5.5,10,-.5,3.6],[5.5,16,2.2,4.2],[5.5,22,.8,5],[5.5,27,-1,5.4]]});
+sweep('foot','hoof',{n:8,mirror:true,
+  path:[[5.5,.5,3.5,4,6.5],[5.5,2.5,1.2,3.4,4.2],[5.5,4,-1,3,3]]});
+for(const dx of [-2,0,2]) spike('toe'+dx,[5.5+dx,1.6,8.8],[5.5+dx,.8,13.5],.9,{n:3,mirror:true});
+spike('knee',[5.5,15.5,5],[5.5,15,10.5],1.6,{mirror:true});
+/* ---- braço direito pendurado / braço esquerdo erguido segurando a bola de fogo ---- */
+sweep('armR','skin',{n:8,capEnd:true,
+  path:[[8.5,49,4,4.2],[11.5,43.5,5.5,3.6],[12.2,37.5,6.8,3.2],[11.8,31.5,9.5,3],[11.2,26.5,11.5,2.6],[11,23.5,12.5,3.4,3]]});
+for(const dx of [-1.6,0,1.6]) spike('clawR'+dx,[11+dx,22.8,12.5],[11+dx*1.3,18.5,13.8],.8,{n:3});
+spike('elbowR',[12.8,38,5.8],[16.8,36,1.8],1.7);
+sweep('armL','skin',{n:8,capEnd:true,
+  path:[[-8.5,49,4,4.2],[-13.5,46,4.5,3.6],[-15.5,51,7,3.2],[-14,56.5,10,2.9],[-12.5,60,11.5,2.6],[-12.2,62.5,12,3.4,3]]});
+spike('elbowL',[-16.2,49.5,6],[-20.5,46.5,3],1.7);
+sweep('fireball','fist',{n:8,group:'eyes',
+  path:[[-12.2,62.8,12.2,0,0],[-12.2,64.5,12.2,3.4],[-12.2,67.5,12.2,4.4],[-12.2,70.5,12.2,3.2],[-12.2,72.5,12.2,0,0]]});
+/* ---- espinhos: ombros e costas, cauda ---- */
+spike('shoulder',[8.5,50.5,4.5],[12.5,56.5,3],1.9,{mirror:true});
+for(const y of [37,42,47]) spike('back'+y,[0,y,zc(y)-trz(y)+.8],[0,y+2.5,zc(y)-trz(y)-4.5],1.5);
+sweep('tail','skin',{n:5,
+  path:[[0,27,-4,2.4],[0,25,-8.5,2],[0,24,-13.5,1.5],[0,26,-17.5,1],[0,29.5,-19.5,0,0]]});
+
+/* ---- cabeça: crânio inclinado, rosto achatado, mandíbula com presas ---- */
+sweep('skull','skin',{n:8,capEnd:true,
+  path:[[0,54.5,7.5,4.6,4.4],[0,59,9,6.2,5.8],[0,63,8.5,5.2,4.8],[0,65.5,7.8,3,2.8]]});
+sweep('snout','skin',{n:8,capEnd:true,capCell:'muzzle',
+  path:[[0,58.5,12.5,3.6,3.2],[0,58,18,3.2,2.8]]});
+sweep('jaw','pink',{n:6,capEnd:true,capCell:'mouth',
+  path:[[0,54.5,10,3.4,1.8],[0,53.8,15,3,1.5],[0,53.2,18.5,2.4,1.2]]});
+spike('fang',[1.8,55.2,17.6],[1.9,59,18.3],.8,{n:3,mirror:true});
+sweep('ear','pink',{n:4,ph:45,mirror:true,ref:[0,0,1],
+  path:[[5.5,60,8,.7,2.2],[9,61.5,7,.6,1.8],[12.5,64,6,0,0]]});
+sweep('hornS','horn',{n:4,ph:45,mirror:true,gt:true,ref:[0,0,1],
+  path:[[3.2,65,8,1.5],[4.6,68.5,7.5,1.1],[3.8,72,7,0,0]]});
+sweep('brow','brow',{n:4,ph:45,mirror:true,ref:[0,1,0],
+  path:[[.6,63.4,13.6,1.1,1.1],[4.6,64.4,12.3,1.2,1.2]]});
+sweep('eye','eye',{n:6,mirror:true,group:'eyes',capEnd:true,
+  path:[[2.6,61.5,12.2,1.3,1.1],[2.6,61.4,13.8,1,.9]]});
+
+/* ---- interior (aparece no corte) ---- */
+const spineP=[]; for(let i=0;i<12;i++){ const y=28+i*2.3; spineP.push([-1.9,y,zc(y)-trz(y)+2.6,i%2?1.2:1.7]); }
+sweep('spine','bone',{n:6,group:'inner',path:spineP});
+[37.5,40.5,43.5,46.5].forEach((y0,ri)=>{
+  const R=trx(y0)*.8, rzr=trz(y0)*.8;
+  const path=[.1,.33,.58,.8,.96].map(f=>{ const phi=f*Math.PI;
+    return [-1.9-(R-1.9)*Math.sin(phi), y0-2.5*f, zc(y0)-rzr*Math.cos(phi), .7]; });
+  sweep('rib'+ri,'bone',{n:4,ph:45,group:'inner',path});
+});
+sweep('sternum','bone',{n:4,ph:45,group:'inner',
+  path:[[-1.6,36,zc(36)+.8*trz(36),1.1,.7],[-1.6,48,zc(48)+.8*trz(48),1.4,.7]]});
+{ const z=zc(45)-3;
+  sweep('lung','organ',{n:8,group:'inner',path:[[-5,40,z,0,0],[-5,42,z,3.2,3.4],[-5,46,z,3.8,3.8],[-5,49.5,z,2.6,2.8],[-5,51,z,0,0]]}); }
+{ const z=zc(34)+.5;
+  sweep('stomach','organ',{n:8,group:'inner',path:[[-4,30,z,0,0],[-4,32,z,3,2.8],[-4,35.5,z,3.6,3.2],[-4,37.5,z,0,0]]}); }
+const gut=[]; for(let i=0;i<9;i++){ const t=i*1.1; gut.push([-3.6+1.6*Math.cos(t),27+i*.65,zc(29)+.5+1.5*Math.sin(t),1.5]); }
+sweep('gut','gut',{n:6,group:'inner',capStart:true,capEnd:true,path:gut});
+/* glândula de fogo + ducto: grupo próprio para pulsar */
+sweep('gland','heart',{n:8,group:'heart',path:[[-3.8,40,5,0,0],[-3.8,41.5,5,2.4,2.2],[-3.8,44,5,3.2,2.8],[-3.8,46.5,5,2.2,2],[-3.8,47.8,5,0,0]]});
+sweep('duct','heart',{n:5,group:'heart',capEnd:true,path:[[-3.2,46.5,5,1.1],[-2.6,50,4.5,1],[-1.5,53,3.5,.9]]});
+const HC=[-3.8,44,5];
+
+/* ---- pedestal ---- */
+sweep('plinth','stone',{n:8,ph:22.5,group:'plinth',capEnd:true,
+  path:[[0,-9,0,26],[0,-4,0,24.5],[0,0,0,22]]});
+
+/* ---- monta BufferGeometry: UV cilíndrico explícito (sweeps) ou planar por parte (tampas) ---- */
+function buildGeo(list, forceCell, center){
+  const pos=[], uv=[];
+  for(const p of list){
+    const mn=[1e9,1e9,1e9], mx=[-1e9,-1e9,-1e9];
+    for(const t of p.tris) for(const v of t) for(let i=0;i<3;i++){ mn[i]=Math.min(mn[i],v[i]); mx[i]=Math.max(mx[i],v[i]); }
+    const nrm=(v,i)=>{ const d=mx[i]-mn[i]; return d>1e-6?(v[i]-mn[i])/d:.5; };
+    for(const tri of p.tris){
+      const [a,b,c]=tri;
+      const [cx,cy,cw,ch]=cells[forceCell||tri.cell||p.cell];
+      const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], w=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+      const n=[u[1]*w[2]-u[2]*w[1], u[2]*w[0]-u[0]*w[2], u[0]*w[1]-u[1]*w[0]].map(Math.abs);
+      [a,b,c].forEach((v,vi)=>{
+        const q=center?[v[0]-center[0],v[1]-center[1],v[2]-center[2]]:v;
+        pos.push(q[0]*CELL, q[1]*CELL, q[2]*CELL);
+        let s,t;
+        if(tri.uv){ [s,t]=tri.uv[vi]; }
+        else if(n[1]>=n[0] && n[1]>=n[2]){ s=nrm(v,0); t=nrm(v,2); }
+        else if(n[2]>=n[0])              { s=nrm(v,0); t=1-nrm(v,1); }
+        else                             { s=nrm(v,2); t=1-nrm(v,1); }
+        uv.push((cx+.5+s*(cw-1))/64, 1-(cy+.5+t*(ch-1))/64);
+      });
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.computeVertexNormals();
+  return g;
+}
+
+/* ================= materiais: flat shading + snap de vértice em pixel ================= */
+const clip = new THREE.Plane(new THREE.Vector3(-1,0,0), 0);      // mantém x <= constant
+function snapPx(m){
+  m.onBeforeCompile = s=>{
+    s.vertexShader = s.vertexShader.replace('#include <project_vertex>',
+      `#include <project_vertex>
+       { const vec2 hr = vec2(${(W/2).toFixed(1)}, ${(H/2).toFixed(1)});
+         vec4 sp = gl_Position; sp.xy = floor(sp.xy/sp.w*hr + .5)/hr*sp.w; gl_Position = sp; }`);
+  };
+  return m;
+}
+const common = {flatShading:true, clippingPlanes:[clip]};
+const matOut  = snapPx(new THREE.MeshLambertMaterial({map:tex, ...common}));
+const matIn   = snapPx(new THREE.MeshLambertMaterial({map:tex, side:THREE.BackSide, emissive:0x2a0a10, ...common}));
+const matHeart= snapPx(new THREE.MeshLambertMaterial({map:tex, emissive:0xa04810, ...common}));
+const matEye  = snapPx(new THREE.MeshBasicMaterial({map:tex, clippingPlanes:[clip]}));
+const matPlinth = snapPx(new THREE.MeshLambertMaterial({map:tex, flatShading:true}));
+
+/* ================= cena ================= */
+const canvas = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:false, alpha:false});
+renderer.setPixelRatio(1);
+renderer.setSize(W,H,false);
+renderer.localClippingEnabled = true;
+
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffe2c8, 0x3a1420, 1.7));
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.6); sun.position.set(6,8,7); scene.add(sun);
+const rim = new THREE.DirectionalLight(0xff5a20, 1.1); rim.position.set(-6,3,-5); scene.add(rim);
+
+const grp = g=>parts.filter(p=>p.group===g);
+const geoBody=buildGeo(grp('body')), geoBodyIn=buildGeo(grp('body'),'flesh');
+const body  = new THREE.Mesh(geoBody, matOut);
+const inner = new THREE.Mesh(geoBodyIn, matIn);
+const organs= new THREE.Mesh(buildGeo(grp('inner')), matOut);
+const eyes  = new THREE.Mesh(buildGeo(grp('eyes')), matEye);
+const heart = new THREE.Mesh(buildGeo(grp('heart'),null,HC), matHeart);
+const plinth= new THREE.Mesh(buildGeo(grp('plinth')), matPlinth);
+heart.position.set(HC[0]*CELL, HC[1]*CELL, HC[2]*CELL);
+scene.add(body, inner, organs, eyes, heart, plinth);
+const triCount=[body,organs,eyes,heart,plinth].reduce((n,m)=>n+m.geometry.attributes.position.count/3,0);
+const triBy=Object.fromEntries(['body','inner','eyes','heart','plinth'].map(g=>[g,grp(g).reduce((n,p)=>n+p.tris.length,0)]));
+
+const camera = new THREE.PerspectiveCamera(28, W/H, .5, 200);
+const TARGET = new THREE.Vector3(0,3.1,0);
+
+/* render target baixo + pós-processo (quantização + Bayer) */
+const rt = new THREE.WebGLRenderTarget(W,H,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter,depthBuffer:true});
+const post = new THREE.ShaderMaterial({
+  uniforms:{tDiffuse:{value:rt.texture}, uDither:{value:1}, uLevels:{value:LEVELS}},
+  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }`,
+  fragmentShader:`
+    uniform sampler2D tDiffuse; uniform float uDither, uLevels; varying vec2 vUv;
+    const float M[16] = float[16](0.,8.,2.,10., 12.,4.,14.,6., 3.,11.,1.,9., 15.,7.,13.,5.);
+    void main(){
+      vec4 s = texture2D(tDiffuse, vUv);
+      vec3 bg = mix(vec3(.040,.010,.016), vec3(.004,.002,.003), vUv.y);
+      bg += vec3(.30,.060,.0) * smoothstep(.32,.0,vUv.y) * (1.-abs(vUv.x-.5)*1.2);
+      vec3 col = mix(bg, s.rgb, s.a);
+      col = linearToOutputTexel(vec4(col,1.)).rgb;
+      vec2 p = floor(gl_FragCoord.xy);
+      float t = (M[int(mod(p.x,4.)) + 4*int(mod(p.y,4.))] + .5)/16. - .5;
+      float L = uLevels - 1.;
+      gl_FragColor = vec4(floor(col*L + .5 + t*uDither)/L, 1.);
+    }`,
+  depthTest:false, depthWrite:false
+});
+const postScene = new THREE.Scene();
+postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), post));
+const postCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+
+/* ================= interação ================= */
+const state = {slice:1, sliceT:1, dither:true, wire:false, auto:true, az:1.12};
+const $ = id=>document.getElementById(id);
+const sync = ()=>{
+  $('bSlice').setAttribute('aria-pressed',!!state.slice);
+  $('bDither').setAttribute('aria-pressed',state.dither);
+  $('bWire').setAttribute('aria-pressed',state.wire);
+  $('bAuto').setAttribute('aria-pressed',state.auto);
+  post.uniforms.uDither.value = state.dither?1:0;
+  matOut.wireframe = matIn.wireframe = matHeart.wireframe = matEye.wireframe = state.wire;
+};
+const act = {
+  S:()=>state.slice^=1, D:()=>state.dither=!state.dither,
+  W:()=>state.wire=!state.wire, A:()=>state.auto=!state.auto,
+};
+$('bSlice').onclick = ()=>{act.S();sync();};
+$('bDither').onclick= ()=>{act.D();sync();};
+$('bWire').onclick  = ()=>{act.W();sync();};
+$('bAuto').onclick  = ()=>{act.A();sync();};
+addEventListener('keydown',e=>{ const f=act[e.key.toUpperCase()]; if(f&&!e.ctrlKey&&!e.metaKey){f();sync();} });
+let drag=null;
+const wrap=$('wrap');
+wrap.addEventListener('pointerdown',e=>{drag=e.clientX; state.auto=false; sync(); wrap.setPointerCapture(e.pointerId);});
+wrap.addEventListener('pointermove',e=>{ if(drag!==null){ state.az -= (e.clientX-drag)*.012; drag=e.clientX; } });
+wrap.addEventListener('pointerup',()=>drag=null);
+sync();
+
+/* HUD */
+$('atlas').getContext('2d').drawImage(atlas,0,0);
+$('stats').innerHTML = `
+  <dt>triângulos</dt><dd class="${triCount<=BUDGET?'ok':''}">${triCount} / ${BUDGET}</dd>
+  <dt>por grupo</dt><dd>${Object.entries(triBy).map(([k,v])=>k+' '+v).join(' · ')}</dd>
+  <dt>textura</dt><dd>64×64 · 16 células · nearest</dd>
+  <dt>render</dt><dd>${W}×${H}</dd>
+  <dt>grade</dt><dd>${GRID} cél = ${GRID*CELL} u</dd>
+  <dt>cores</dt><dd>${LEVELS}³ + Bayer 4×4</dd>
+  <dt>sombreamento</dt><dd>flat</dd>`;
+
+/* ================= loop ================= */
+const v3 = new THREE.Vector3();
+const lead=$('lead'), dot=$('dot'), lbl=$('lbl');
+const t1=$('t1'), t2=$('t2');
+function frame(ms){
+  const t = ms/1000;
+  if(state.auto) state.az = 1.12 + .3*Math.sin(t*.45);
+  const d=19, el=.16;
+  camera.position.set(Math.sin(state.az)*Math.cos(el)*d, TARGET.y+Math.sin(el)*d, Math.cos(state.az)*Math.cos(el)*d);
+  camera.lookAt(TARGET);
+
+  state.sliceT += (state.slice - state.sliceT)*.12;
+  clip.constant = (1-state.sliceT)*3.2;
+  inner.visible = state.sliceT > .01;
+
+  const beat = Math.pow(Math.max(0,Math.sin(t*Math.PI*2*1.6)),4);
+  heart.scale.setScalar(1 + .22*beat);
+
+  renderer.setRenderTarget(rt);
+  renderer.setClearColor(0x000000,0);
+  renderer.clear();
+  renderer.render(scene,camera);
+  renderer.setRenderTarget(null);
+  renderer.render(postScene,postCam);
+
+  // rótulo: ponta do coração projetada na tela
+  const show = state.sliceT>.97 && Math.sin(state.az)>.6;
+  lbl.style.opacity = show?1:0;
+  if(show){
+    v3.copy(heart.position).project(camera);
+    const hx=(v3.x*.5+.5)*W, hy=(1-(v3.y*.5+.5))*H;
+    const ly = Math.round(hy);
+    t1.setAttribute('y', ly-14); t2.setAttribute('y', ly-5);
+    lead.setAttribute('points',`263,${ly+1} ${(hx+4).toFixed(1)},${ly+1}`);
+    dot.setAttribute('cx',hx.toFixed(1)); dot.setAttribute('cy',hy.toFixed(1));
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+window.__baron = {triCount, triBy, state};
+</script>
+</body>
+</html>
+
+</script>
+</body>
+</html>
