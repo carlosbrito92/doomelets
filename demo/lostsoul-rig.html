@@ -264,6 +264,7 @@ const TONGUES = [];
 const fireball = ball(0.2, 'fireC', 0, -0.2, 0.45, J.root, 1, 1, 1);
 fireball.visible = false;
 
+model.scale.setScalar(0.55);   // menor que os demônios
 model.traverse(o => { if (o.isMesh) allMeshes.push(o); });
 
 /* cenário das animações de pulo: chão + degrau (fora do rig, não entra no cálculo de apoio dos pés) */

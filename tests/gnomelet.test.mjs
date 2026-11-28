@@ -8,6 +8,7 @@ import { Gnomelet } from '../src/gnomelet.js';
 import { DoomSlayer } from '../src/characters/doom-slayer.js';
 import { Imp } from '../src/characters/imp.js';
 import { Cacodemon } from '../src/characters/cacodemon.js';
+import { LostSoul } from '../src/characters/lost-soul.js';
 
 const settings = {
     get_int: k => ({ 'gnomelet-scale': 64, 'jump-power': 40, 'spawn-offset': 0 })[k] ?? 0,
@@ -222,4 +223,18 @@ test('manager (GNOME): sem seleção salva usa os personagens padrão (e nunca o
     const types = new Set();
     for (let i = 0; i < 40; i++) types.add(m._pickResource().type);
     assert.deepEqual([...types].sort(), ['Cacodemon', 'Imp']);
+});
+
+test('Lost Soul flutua como o Cacodemon, mas é inofensiva: sem vida, sem atirar, e olha para onde vai', () => {
+    const ls = make(LostSoul, 'LostSoul');
+    const slayer = make(DoomSlayer, 'DoomSlayer'); ground(slayer); slayer._x = ls._x + 20; slayer._y = ls._y;
+    for (let i = 0; i < 400; i++) {
+        ls.update([], false, null, [slayer, ls]);
+        assert.notEqual(ls._state, State.SHOOTING);
+    }
+    assert.equal(ls._maxHp, 0);
+    assert.equal(ls._state, State.FLOATING);
+    ls.takeDamage(5); assert.equal(ls._isDead, false);
+    ls._velX = -2; assert.equal(ls.facingRight, false);
+    ls._velX = 2; assert.equal(ls.facingRight, true);
 });

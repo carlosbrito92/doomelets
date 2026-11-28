@@ -18,7 +18,7 @@ The desktop pet engine (physics, window and dock interaction, multi-monitor supp
 * **Sprite pipeline:** three.js rigs and a script that renders them to PNG frames.
 * **Its own extension identity:** UUID `doomelets@carlosbrito92.github.com` and settings schema `org.gnome.shell.extensions.doomelets`.
 
-The six characters inherited from Gnomelets (Kitten, Mouse, Puppy, Santa, Squirrel and Tux) were removed. Their role, harmless companions the Slayer can pet, is taken by three characters: **Daisy** (a plush rabbit), **Pinky** (a hunched pink demon) and **Lost Soul** (a floating flaming skull). They have no hit points, ignore the fighting and are rendered from 3D rigs in `demo/` by `scripts/render_doom_sprites.py`; see `docs/ESTILO_PIXEL_RIG.md` for the visual style.
+The six characters inherited from Gnomelets (Kitten, Mouse, Puppy, Santa, Squirrel and Tux) were removed. Their role, harmless companions the Slayer can pet, is taken by three characters: **Daisy** (a plush rabbit), **Pinky** (a hunched pink demon) and **Lost Soul** (a floating flaming skull: it drifts like the Cacodemon, at its own random height, and faces where it goes). They have no hit points, ignore the fighting and are rendered from 3D rigs in `demo/` by `scripts/render_doom_sprites.py`; see `docs/ESTILO_PIXEL_RIG.md` for the visual style.
 
 ## Doom characters
 

@@ -7,6 +7,7 @@ import { State } from '../kwin/contents/code/utils.mjs';
 import { DoomSlayer } from '../kwin/contents/code/characters/doom-slayer.mjs';
 import { Imp } from '../kwin/contents/code/characters/imp.mjs';
 import { Cacodemon } from '../kwin/contents/code/characters/cacodemon.mjs';
+import { LostSoul } from '../kwin/contents/code/characters/lost-soul.mjs';
 import { GnomeletManager } from '../kwin/contents/code/manager.mjs';
 
 const HP = { 'health-DoomSlayer': 12, 'health-Imp': 3, 'health-Cacodemon': 5 };
@@ -235,4 +236,18 @@ test('Imp reconhece o Slayer Eternal como ameaça', () => {
     imp._allEntities = [eternal, imp];
     imp._hp = 1; imp._pickNewAction();
     assert.equal(imp._state, State.CHASING); assert.ok(imp._vx > 0);
+});
+
+test('Lost Soul flutua como o Cacodemon, mas é inofensiva: sem vida, sem atirar, e olha para onde vai', () => {
+    const ls = make(LostSoul, 'LostSoul');
+    const slayer = make(DoomSlayer, 'DoomSlayer'); ground(slayer); slayer._x = ls._x + 20; slayer._y = ls._y;
+    for (let i = 0; i < 400; i++) {
+        ls.update([], false, null, [slayer, ls]);
+        assert.notEqual(ls._state, State.SHOOTING);
+    }
+    assert.equal(ls._maxHp, 0);
+    assert.equal(ls._state, State.FLOATING);
+    ls.takeDamage(5); assert.equal(ls._isDead, false);
+    ls._velX = -2; assert.equal(ls.facingRight, false);
+    ls._velX = 2; assert.equal(ls.facingRight, true);
 });

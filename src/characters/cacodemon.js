@@ -42,6 +42,8 @@ export const Cacodemon = GObject.registerClass(
             this._shootCooldownMax = 100; // ticks (~5s)
             this._shootDuration    = 0;
             this._shootDurationMax = 12;  // ticks que fica no estado SHOOTING
+            this._aggressive      = true;  // falso nas variações inofensivas (Lost Soul)
+            this._anchorFrac       = 0.25;  // altura de flutuação, como fração da altura do monitor
         }
 
         /**
@@ -122,7 +124,7 @@ export const Cacodemon = GObject.registerClass(
 
             // Movimento vertical senoidal — ancorado no terço superior do monitor
             const monitor = Main.layoutManager.primaryMonitor;
-            const anchorY  = monitor.y + monitor.height * 0.25;
+            const anchorY  = monitor.y + monitor.height * this._anchorFrac;
             this._y = anchorY + Math.sin(this._floatTimer * FLOAT_FREQUENCY) * FLOAT_AMPLITUDE;
 
             // IA: detectar Slayer e disparar
@@ -132,7 +134,7 @@ export const Cacodemon = GObject.registerClass(
                 const dy = slayer._y - this._y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
-                if (dist < this._detectRange && this._shootCooldown === 0) {
+                if (this._aggressive && dist < this._detectRange && this._shootCooldown === 0) {
                     this._state = State.SHOOTING;
                     this._shootDuration = this._shootDurationMax;
                     this._shootCooldown = this._shootCooldownMax;
@@ -167,7 +169,7 @@ export const Cacodemon = GObject.registerClass(
         arriveAt(rect) {
             const monitor = Main.layoutManager.primaryMonitor;
             this._x = rect.x + rect.width / 2 - this._displayW / 2;
-            this._y = monitor.y + monitor.height * 0.25;
+            this._y = monitor.y + monitor.height * this._anchorFrac;
             this._floatSpeedX = (Math.random() > 0.5 ? 1 : -1) * 1.5;
             this._velX = this._floatSpeedX;
             this._state = State.SPAWNING;
