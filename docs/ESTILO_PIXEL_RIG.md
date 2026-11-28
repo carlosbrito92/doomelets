@@ -1,6 +1,6 @@
 # Estilo visual: pixel rig
 
-Guia da estética dos personagens do Doomelets (Doom Slayer, Imp, Cacodemon, Lost Soul, Pinky). Serve para criar personagens novos sem destoar dos existentes.
+Guia da estética dos personagens do Doomelets (Doom Slayer, Imp, Cacodemon, Lost Soul, Pinky, Daisy). Serve para criar personagens novos sem destoar dos existentes.
 
 Resumo: **modelos 3D low-poly feitos de formas suaves, renderizados em baixíssima resolução com 3 tons por peça, pontilhado ordenado e contorno de tinta.** Não é pixel art desenhada à mão e não usa cubos. A impressão de pixel art vem do pipeline de render, não da arte.
 
@@ -74,6 +74,10 @@ Cada peça tem uma rampa de **3 cores: sombra, base, luz**. A sombra puxa para u
 
 Bípede curvado: pélvis com duas pernas, tronco inclinado, braços grossos com cotovelo dobrado, cúpula rosa em cima do corpo com espinhos de ouro. Rosto de frente: elmo vermelho com sobrancelha pesada, rosto claro, duas fileiras de dentes e duas presas. Modelo escalado a 72% para caber no quadro de perfil; a pose-base (tronco, cabeça, braços) é somada às poses em `applyPose`.
 
+### Daisy
+
+Coelha de pelúcia de quatro patas (ref.: pelúcia marrom). Peças: `fur` (`#5a3418` / `#b8742c` / `#e8a458`), `lite` (focinho, `#8a5a30` / `#d89c50` / `#f8c878`), `cream` (`#a09068` / `#f0e4b8` / `#fffbe0`), `eye` (preto, também a ponta das orelhas), `shine`, `tongue` e `nose`. O salto usa um parâmetro `e` de 0 (agachada) a 1 (esticada no ar), com as patas de trás levemente atrasadas em relação às da frente; as pernas traseiras ficam dobradas na pose-base, somada em `applyPose`. O modelo está a 62% da escala, de propósito: a Daisy é bem menor que os demônios (sprite final de 82 × 70 contra 162 × 133 da Pinky).
+
 Imp e Doom Slayer seguem a mesma lógica; as rampas estão no início de `demo/imp-rig.html` e `demo/doomguy-rig.html`.
 
 ### Peças que brilham (fogo e brasa)
@@ -98,6 +102,7 @@ Fogo e brasas não recebem sombra de verdade. Em `GLOW` o brilho da peça é fix
 | Cacodemon | 25° | 8° |
 | Lost Soul | 45° | 8° |
 | Pinky | 60° | 8° |
+| Daisy | 65° | 8° |
 
 Giro 90° mostra o perfil virado para a direita. **A arte sempre olha para a direita**; o jogo espelha pelo centro quando o personagem anda para a esquerda.
 
