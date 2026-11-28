@@ -105,6 +105,9 @@ Item {
         imageUrl: (type, i) => Qt.resolvedUrl("../images/" + type + "/" + i + ".png"),
         createView: entity => spriteComponent.createObject(stage, { entity: entity }),
         createProjectileView: p => projectileComponent.createObject(stage, { look: p.look }),
+        pointer: () => Workspace.cursorPos,
+        createPortalView: p => portalComponent.createObject(stage, { cx: p.x - overlay.x, cy: p.y - overlay.y }),
+        windowRect: w => Win.liveRect(w, Workspace),
         collectWindows: (floorMode, walkOnPanels) => {
             const r = Win.collectWindows(Workspace, floorMode, walkOnPanels);
             root.lastStack = r.stack;
@@ -156,6 +159,14 @@ Item {
         Image {
             property var entity
             property var handle: null
+            // Movimento contínuo: a lógica roda a 20 Hz, então cada passo desliza durante um tick.
+            // glide=false posiciona direto (arrastar, teleporte, primeira posição).
+            property bool glide: false
+            property real tx: 0
+            property real ty: 0
+            property bool placed: false
+            Behavior on x { enabled: glide; NumberAnimation { duration: tickTimer.interval; easing.type: Easing.Linear } }
+            Behavior on y { enabled: glide; NumberAnimation { duration: tickTimer.interval; easing.type: Easing.Linear } }
             smooth: true
             fillMode: Image.PreserveAspectFit
             cache: true
@@ -171,6 +182,8 @@ Item {
             property var look
             width: look.size
             height: look.size
+            Behavior on x { NumberAnimation { duration: tickTimer.interval; easing.type: Easing.Linear } }
+            Behavior on y { NumberAnimation { duration: tickTimer.interval; easing.type: Easing.Linear } }
             Rectangle {   // brilho
                 anchors.centerIn: parent
                 width: parent.width + look.glowSize * 2
@@ -184,6 +197,26 @@ Item {
                 radius: width / 2
                 color: look.color
             }
+        }
+    }
+
+    // Anel de fogo onde um demônio entra ou sai de cena (centro em cx, cy)
+    Component {
+        id: portalComponent
+        Rectangle {
+            property real cx: 0
+            property real cy: 0
+            width: 64
+            height: 64
+            x: cx - width / 2
+            y: cy - height / 2
+            radius: 32
+            color: "#40ff5a14"
+            border.width: 3
+            border.color: "#ff7a1a"
+            transformOrigin: Item.Center
+            NumberAnimation on scale { from: 0.2; to: 1.3; duration: 700; easing.type: Easing.OutQuad }
+            NumberAnimation on opacity { from: 1; to: 0; duration: 700; easing.type: Easing.OutQuad }
         }
     }
 
@@ -225,6 +258,7 @@ Item {
         const c = Workspace.cursorPos;
         dragOffset = Qt.point(c.x - entity._x, c.y - entity._y);
         dragged = entity;
+        entity.actor.glide = false;
         entity.beginDrag();
         entity.dragTo(entity._x, entity._y);
     }
@@ -245,8 +279,14 @@ Item {
             if (url && v.source !== url) v.source = url;
             v.width = e._displayW;
             v.height = e._displayH;
-            v.x = Math.floor(e._x) - ox;
-            v.y = Math.floor(e._y) - oy;
+            const nx = Math.floor(e._x) - ox, ny = Math.floor(e._y) - oy;
+            // Saltos grandes (renascer, arremesso, troca de tela) e o arrasto não deslizam
+            v.glide = v.placed && e !== dragged && Math.hypot(nx - v.tx, ny - v.ty) <= Utils.SMOOTH_SNAP_PX;
+            v.x = nx;
+            v.y = ny;
+            v.tx = nx;
+            v.ty = ny;
+            v.placed = true;
             v.mirror = !e.facingRight;
             const cx = e._x + e._displayW / 2, cy = e._y + e._displayH / 2;
             // Pisando numa janela: some atrás das janelas acima dela. No chão/painel, só em
@@ -268,6 +308,22 @@ Item {
             p.actor.x = Math.floor(p._x) - ox;
             p.actor.y = Math.floor(p._y) - oy;
         }
+    }
+
+    // ---------------------------------------------------------------- eventos de janela
+
+    property var hooked: []     // janelas cujo minimizedChanged já ouvimos
+
+    function hookWindow(w) {
+        if (!w || hooked.indexOf(w) >= 0 || Win.isOwnWindow(w)) return;
+        hooked.push(w);
+        w.minimizedChanged.connect(() => {
+            if (w.minimized && root.manager) root.manager.onWindowGone(Win.departingRect(w));
+        });
+    }
+
+    function pruneHooked() {
+        hooked = hooked.filter(w => { try { return !w.deleted; } catch (e) { return false; } });
     }
 
     // ---------------------------------------------------------------- laços
@@ -314,6 +370,14 @@ Item {
     Connections {
         target: Workspace
         function onVirtualScreenGeometryChanged() { root.placeOverlay(); }
+        function onWindowAdded(w) {
+            root.hookWindow(w);
+            if (root.manager && !Win.isOwnWindow(w) && Win.isSurface(w)) root.manager.onWindowAdded(w);
+        }
+        function onWindowRemoved(w) {
+            if (root.manager) root.manager.onWindowGone(Win.departingRect(w));
+            root.pruneHooked();
+        }
     }
 
     ShortcutHandler {
@@ -343,6 +407,7 @@ Item {
         overlay.show();
         manager = new Core.GnomeletManager(settings, host);
         manager.enable();
+        for (const w of Workspace.stackingOrder) hookWindow(w);
         tickTimer.start();
     }
 

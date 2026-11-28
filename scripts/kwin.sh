@@ -42,6 +42,8 @@ build() {
     cp "$PROJECT_ROOT/kwin/contents/ui/config.ui" "$dest/contents/ui/"
     cp "$PROJECT_ROOT/kwin/entry.qml" "$dest/contents/ui/main.qml"
     cp -r "$PROJECT_ROOT/kwin/contents/code" "$root/"
+    # Lógica de comportamento compartilhada com o GNOME (pura, sem imports): fonte única em src/
+    cp "$PROJECT_ROOT/src/behavior.js" "$root/code/behavior.mjs"
     cp "$PROJECT_ROOT/kwin/contents/ui/main.qml" "$root/ui/"
     for dir in "$PROJECT_ROOT"/src/images/*/; do
         cp -r "$dir" "$root/images/"

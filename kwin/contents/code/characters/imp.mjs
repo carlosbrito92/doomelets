@@ -1,10 +1,12 @@
 // Port KWin de src/characters/imp.js — a IA é a mesma; mudou só a parte de GObject/Shell.
 import { Gnomelet } from '../gnomelet.mjs';
+import { fleeDirection } from '../behavior.mjs';
 import {
     State,
     WALK_SPEED,
     IMP_WALK_SPEED,
     IMP_CHASE_SPEED,
+    platform,
 } from '../utils.mjs';
 
 /**
@@ -32,6 +34,11 @@ export class Imp extends Gnomelet {
         this._throwDuration     = 0;
         this._throwDurationMax  = 20;   // ticks que fica no estado THROWING
         this._currentTarget     = null;
+        this._fleeing           = false;
+
+        // Idle: 'taunt' (provocar) só toca quando o manifesto do Imp tiver essa animação
+        this._idleVariants  = [{ name: 'taunt', weight: 1, cooldown: 400 }, { name: null, weight: 3 }];
+        this._stareReaction = 'taunt';
 
         // Callback para criar projétil no manager
         this._spawnProjectileCb = spawnProjectileCb ?? null;
@@ -50,6 +57,20 @@ export class Imp extends Gnomelet {
             const dx = slayer._x - this._x;
             const dy = slayer._y - this._y;
             const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Quase morto: foge do Slayer em vez de lutar (encurralado na borda, enfrenta)
+            const flee = fleeDirection({
+                hp: this._hp, maxHp: this._maxHp, fleeing: this._fleeing, dist,
+                selfX: this._x + this._displayW / 2, threatX: slayer._x + slayer._displayW / 2,
+                screenW: platform.stageWidth(),
+            });
+            this._fleeing = flee !== 0;
+            if (flee !== 0) {
+                this._currentTarget = null;
+                this._state = State.CHASING;     // anima como 'run'
+                this._vx = flee * IMP_CHASE_SPEED;
+                return;
+            }
 
             // Detectou o Slayer
             if (dist < this._detectRange) {

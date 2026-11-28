@@ -40,6 +40,23 @@ To remove everything: `./scripts/kwin.sh uninstall`.
 
 To update after pulling new code, run `./scripts/kwin.sh install` again.
 
+## Behaviour added after the first port
+
+These work the same as in the GNOME extension (see the README):
+
+* **Smooth motion:** the simulation runs at 20 Hz, but each character and projectile glides to its next position during a tick (a QML `Behavior`), so movement on screen is continuous. Jumps over 48 px (respawn, throwing, changing screen) and dragging are not smoothed.
+* **Cursor curiosity:** an idle character turns to face the mouse; after about 3 s it plays its `look` / `taunt` reaction. The Cacodemon drifts toward the cursor but keeps its distance.
+* **Window events:** a new window sometimes opens a fire portal on its top edge and drops an Imp or Cacodemon (only types selected in the settings; about 2 minutes, then it leaves through another portal). Windows opening, closing or minimizing make nearby characters stop and look.
+* **Scenes:** a wounded Imp (1 HP) runs from the Doom Slayer; if the mouse has not moved for ~30 s the Doom Slayer comes and stands guard next to it.
+
+The behaviour logic is shared with GNOME: `src/behavior.js` is copied into the package as `code/behavior.mjs` by `scripts/kwin.sh`, so there is one source for both. Tests for the KWin classes run in Node, without Plasma:
+
+```bash
+node --import ./tests/support/kwin-register.mjs --test tests/kwin.test.mjs
+```
+
+The QML side (window signals, portal item, gliding) is only checked for syntax here; try it on a real session with `./scripts/kwin.sh dev`.
+
 ## Settings
 
 Open **Doomelets Settings** from the application menu, press `Meta+Ctrl+S`, or use System Settings → Window Management → KWin Scripts → Doomelets → Configure. Changes apply within about two seconds after **OK** or **Apply**.

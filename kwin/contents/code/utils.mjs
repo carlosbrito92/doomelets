@@ -1,6 +1,20 @@
 // Port KWin das constantes de src/utils.js — mantenha os dois em sincronia.
 
 export const UPDATE_INTERVAL_MS = 50; // Update loop runs every 50ms (~20 FPS)
+// Interação com o ponteiro e eventos de janela (espelha src/utils.js)
+export const SMOOTH_SNAP_PX = 48;       // saltos maiores que isso (px/tick) não são suavizados na tela
+export const CURIOSITY_RANGE = 220;
+export const CURIOSITY_NOTICE_TICKS = 6;
+export const CURIOSITY_STARE_TICKS = 60;
+export const CACO_FOLLOW_RANGE = 700;
+export const CACO_FOLLOW_STOP = 150;
+export const CACO_FOLLOW_SPEED = 2.4;
+export const CACO_FOLLOW_ACCEL = 0.12;
+export const IDLE_VARIANT_MIN_TICKS = 20;
+export const NOTICE_RANGE = 700;
+export const NOTICE_PAUSE_TICKS = 30;
+export const PORTAL_DEMON_TTL = 2400;
+export const GUARD_AFTER_TICKS = 600;
 export const GRAVITY = 2;             // Vertical acceleration per frame
 export const WALK_SPEED = 3;          // Horizontal pixels per frame
 

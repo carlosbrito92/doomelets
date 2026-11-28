@@ -10,8 +10,15 @@ import {
     GRAVITY,
     WALK_SPEED,
     UPDATE_INTERVAL_MS,
+    CURIOSITY_RANGE,
+    CURIOSITY_NOTICE_TICKS,
+    CURIOSITY_STARE_TICKS,
+    IDLE_VARIANT_MIN_TICKS,
+    NOTICE_PAUSE_TICKS,
     platform,
 } from './utils.mjs';
+// behavior.mjs é gerado por scripts/kwin.sh a partir de src/behavior.js (fonte única, sem GNOME)
+import { IdleScheduler, Curiosity, facingToward } from './behavior.mjs';
 
 export class Gnomelet {
     constructor(typeName, frameImages, frameWidth, frameHeight, settings, resourceProvider) {
@@ -29,6 +36,21 @@ export class Gnomelet {
         this._animationTimer = 0;
         this._savedFacing = Math.random() > 0.5;
         this._idleTimer = 0;
+
+        // --- Idle com variações e curiosidade com o ponteiro (ver behavior.js) ---
+        this._idleVariants = [];        // subclasses: [{ name, weight, cooldown }]; name null = só respirar
+        this._idleSched = null;
+        this._idleSchedFor = null;
+        this._wasIdle = false;
+        this._idleVariant = null;
+        this._idleVariantTicks = 0;
+        this._stareReaction = null;     // animação tocada ao ser encarado pelo cursor ('look', 'taunt'...)
+        this._pointer = null;           // { x, y, dist, level, still }
+        this._curiosity = new Curiosity({
+            range: CURIOSITY_RANGE,
+            noticeTicks: CURIOSITY_NOTICE_TICKS,
+            stareTicks: CURIOSITY_STARE_TICKS,
+        });
 
         this._frameWidth = frameWidth;
         this._frameHeight = frameHeight;
@@ -457,7 +479,104 @@ export class Gnomelet {
         this._vx = dir * WALK_SPEED * 2;
     }
 
+    /** Nome da animação do manifesto: a do estado, ou uma variação de idle sorteada. */
     _animationName() {
+        return this._withIdleVariant(this._stateAnimationName());
+    }
+
+    _scheduler() {
+        if (!this._idleSched || this._idleSchedFor !== this._idleVariants) {
+            this._idleSched = new IdleScheduler(this._idleVariants);
+            this._idleSchedFor = this._idleVariants;
+        }
+        return this._idleSched;
+    }
+
+    /** Toca uma variação de idle agora, se o personagem tem esse quadro e está parado. */
+    _playIdleVariant(name) {
+        const anim = this._frameImages?.animations?.[name];
+        if (!anim || this._state !== State.IDLE || this._idleVariant) return false;
+        this._idleVariant = name;
+        this._idleVariantTicks = Math.ceil(anim.frames.length * anim.ticks);
+        this._idleTimer = Math.max(this._idleTimer, this._idleVariantTicks + 20);
+        this._wasIdle = true;
+        return true;
+    }
+
+    /**
+     * Ao ficar parado, às vezes toca uma variação (recarregar, olhar, bocejar...).
+     * As variações valem só se o manifesto do personagem tiver a animação.
+     */
+    _withIdleVariant(name) {
+        if (this._state !== State.IDLE) {
+            this._wasIdle = false;
+            this._idleVariant = null;
+            return name;
+        }
+        if (!this._wasIdle) {
+            this._wasIdle = true;
+            this._idleVariant = null;
+            // Pausas curtas são de combate (esperando o cooldown): ficam só respirando
+            if (this._idleTimer >= IDLE_VARIANT_MIN_TICKS && this._idleVariants.length) {
+                const choice = this._scheduler().pick(n => !!this._frameImages?.animations?.[n]);
+                if (choice) this._playIdleVariant(choice);
+            }
+        }
+        if (this._idleVariant && this._idleVariantTicks-- > 0) return this._idleVariant;
+        this._idleVariant = null;
+        return name;
+    }
+
+    /** Chamado pelo Manager a cada tick com a posição do ponteiro e há quantos ticks ele está parado. */
+    observePointer(px, py, still = 0) {
+        if (!this.actor) return;
+        this._idleSched?.tick();
+        const cx = this._x + this._displayW / 2, cy = this._y + this._displayH / 2;
+        const dist = Math.hypot(px - cx, py - cy);
+        const before = this._curiosity.level;
+        const level = this._curiosity.update(dist);
+        this._pointer = { x: px, y: py, dist, level, still };
+        if (this._state === State.IDLE && level >= 1) {
+            this._savedFacing = facingToward(cx, px, this._savedFacing);
+        }
+        if (level === 2 && before < 2 && this._stareReaction) {
+            this._playIdleVariant(this._stareReaction);
+        }
+    }
+
+    /**
+     * Algo aconteceu em (px, py) — uma janela abriu, fechou ou minimizou: para e olha para lá.
+     * Só reage quem está andando ou parado; em combate/flutuando ignora.
+     */
+    notice(px, py) {
+        if (!this.actor || this._isDead) return false;
+        if (this._state !== State.WALKING && this._state !== State.IDLE) return false;
+        const cx = this._x + this._displayW / 2;
+        this._savedFacing = facingToward(cx, px, this._savedFacing);
+        this._state = State.IDLE;
+        this._vx = 0;
+        this._idleTimer = Math.max(this._idleTimer, NOTICE_PAUSE_TICKS);
+        this._wasIdle = false;
+        this._idleVariant = null;
+        this._playIdleVariant(this._stareReaction);
+        return true;
+    }
+
+    /**
+     * Entra em cena pousando no topo de uma janela (saída de portal).
+     * Devolve o centro do personagem, onde o portal deve abrir.
+     */
+    arriveAt(rect) {
+        this._x = rect.x + Math.random() * Math.max(1, rect.width - this._displayW);
+        this._y = rect.y - this._displayH;
+        this._vx = 0;
+        this._vy = 0;
+        this._state = State.SPAWNING;
+        this._spawnTimer = 8;
+        return { x: this._x + this._displayW / 2, y: this._y + this._displayH / 2 };
+    }
+
+    _stateAnimationName() {
         switch (this._state) {
             case State.CHASING:    return 'run';
             case State.FLOATING:   return 'float';

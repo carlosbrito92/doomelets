@@ -5,6 +5,9 @@
 //   host.createView(entity)           — cria o item QML do personagem
 //   host.createProjectileView(p)      — cria o item QML do projétil
 //   host.collectWindows(floorMode, walkOnPanels) — { windows, forceBackground }
+//   host.pointer()                    — { x, y } do cursor
+//   host.createPortalView(portal)     — cria o item QML do portal
+//   host.windowRect(win)              — retângulo da janela nova, se ainda viva e visível (senão null)
 // Sem persistência em disco: scripts do KWin não podem escrever arquivos.
 
 import { Gnomelet } from './gnomelet.mjs';
@@ -12,6 +15,9 @@ import { Imp }        from './characters/imp.mjs';
 import { Cacodemon }  from './characters/cacodemon.mjs';
 import { DoomSlayer } from './characters/doom-slayer.mjs';
 import { Projectile } from './projectile.mjs';
+import { Portal } from './portal.mjs';
+import { PointerTracker, PortalGate } from './behavior.mjs';
+import { NOTICE_RANGE, PORTAL_DEMON_TTL } from './utils.mjs';
 
 const SLAYER = 'DoomSlayer';   // sempre exatamente um em cena quando selecionado
 const DEMONS = ['Imp', 'Cacodemon'];
@@ -23,6 +29,10 @@ export class GnomeletManager {
         this._gnomelets = [];
         this._demonQueue = [];
         this._projectiles = [];
+        this._portals = [];                       // anéis de fogo de entrada/saída
+        this._portalGate = new PortalGate();      // janela nova → às vezes sai um demônio
+        this._pointerTracker = new PointerTracker();
+        this._pendingWindows = [];                // janelas novas esperando o primeiro frame
         this._resources = {};
         this._isPaused = !this._settings.get_boolean('is-enabled');
         this.forceBackground = false;
@@ -190,6 +200,8 @@ export class GnomeletManager {
 
     _destroyGnomelets() {
         this._demonQueue = [];
+        this._pendingWindows = [];
+        this._destroyPortals();
         for (let p of this._gnomelets) p.destroy();
         this._gnomelets = [];
         this._destroyProjectiles();
@@ -205,7 +217,14 @@ export class GnomeletManager {
             this.forceBackground = forceBackground;
 
             this._updateDemonQueue();
+            this._portalGate.tick();
+            this._updatePendingWindows();
+            this._updateEphemeral();
+            this._updatePortals();
+            const ptr = this._host.pointer();
+            const pointerStill = this._pointerTracker.update(ptr.x, ptr.y);
             for (let p of this._gnomelets) {
+                p.observePointer(ptr.x, ptr.y, pointerStill);
                 p.update(windows, forceBackground, null, this._gnomelets, this._projectiles);
             }
             this._updateProjectiles();
@@ -213,7 +232,7 @@ export class GnomeletManager {
             if (this._gnomelets.some(g => g._markedForRemoval)) {
                 this._gnomelets = this._gnomelets.filter(g => {
                     if (g._markedForRemoval) {
-                        if (DEMONS.includes(g._typeName)) this._queueDemon(g._typeName);
+                        if (DEMONS.includes(g._typeName) && !g._ephemeral) this._queueDemon(g._typeName);
                         g.destroy();
                         return false;
                     }
@@ -223,6 +242,91 @@ export class GnomeletManager {
         } catch (e) {
             console.warn(`Doomelets tick: ${e}\n${e.stack}`);
         }
+    }
+
+    // ---------- Eventos de janela e portais (chamados pelo main.qml) ----------
+
+    /** Janela nova: espera ~300 ms (6 ticks) pelo primeiro frame antes de olhar a geometria. */
+    onWindowAdded(win) {
+        if (this._isPaused || !win) return;
+        this._pendingWindows.push({ win, ticks: 6 });
+    }
+
+    /** Janela fechou ou minimizou em `rect`: quem está perto para e olha para lá. */
+    onWindowGone(rect) {
+        if (this._isPaused || !rect) return;
+        this._noticeAround(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    }
+
+    _updatePendingWindows() {
+        if (this._pendingWindows.length === 0) return;
+        this._pendingWindows = this._pendingWindows.filter(entry => {
+            if (--entry.ticks > 0) return true;
+            const rect = this._host.windowRect(entry.win);
+            if (rect && rect.width >= 160 && rect.height >= 120) this._onWindowReady(rect);
+            return false;
+        });
+    }
+
+    /** Janela nova pronta: todos reparam; às vezes um demônio sai de um portal no topo dela. */
+    _onWindowReady(rect) {
+        this._noticeAround(rect.x + rect.width / 2, rect.y);
+        this._portalDemon(rect);
+    }
+
+    /** Solta um demônio (efêmero) no topo de `rect`, se o portão permitir. Devolve-o ou null. */
+    _portalDemon(rect) {
+        const active = this._gnomelets.filter(g => DEMONS.includes(g._typeName)).length + this._demonQueue.length;
+        const selected = this._settings.get_strv('gnomelet-type');
+        const type = this._portalGate.consider(active, n => Boolean(this._resources[n]) && selected.includes(n));
+        if (!type) return null;
+        const res = this._pickResource(type);
+        if (!res) return null;
+        const p = this._addCharacter(res);
+        p._ephemeral = true;                 // não renasce ao morrer nem ao sumir
+        p._portalTtl = PORTAL_DEMON_TTL;
+        const at = p.arriveAt(rect);
+        this._addPortal(at.x, at.y);
+        return p;
+    }
+
+    _noticeAround(cx, cy) {
+        for (const g of this._gnomelets) {
+            if (!g.actor) continue;
+            const d = Math.hypot(g._x + g._displayW / 2 - cx, g._y + g._displayH / 2 - cy);
+            if (d < NOTICE_RANGE) g.notice(cx, cy);
+        }
+    }
+
+    _addPortal(x, y) {
+        const portal = new Portal(x, y);
+        portal.actor = this._host.createPortalView(portal);
+        this._portals.push(portal);
+    }
+
+    /** Demônios de portal somem depois de um tempo (com um portal de saída). */
+    _updateEphemeral() {
+        for (const g of this._gnomelets) {
+            if (!(g._portalTtl > 0) || g._markedForRemoval) continue;
+            if (--g._portalTtl === 0) {
+                this._addPortal(g._x + g._displayW / 2, g._y + g._displayH / 2);
+                g._markedForRemoval = true;
+            }
+        }
+    }
+
+    _updatePortals() {
+        if (this._portals.length === 0) return;
+        this._portals = this._portals.filter(p => {
+            p.update();
+            if (!p.alive) { p.destroy(); return false; }
+            return true;
+        });
+    }
+
+    _destroyPortals() {
+        for (const p of this._portals) p.destroy();
+        this._portals = [];
     }
 
     _updateEnabledState() {

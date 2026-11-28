@@ -1,13 +1,16 @@
 // Port KWin de src/characters/doom-slayer.js — a IA é a mesma; mudou só a parte de GObject/Shell.
 import { Gnomelet } from '../gnomelet.mjs';
+import { guardMove, facingToward } from '../behavior.mjs';
 import {
     State,
     WALK_SPEED,
     SLAYER_CHASE_SPEED,
+    GUARD_AFTER_TICKS,
 } from '../utils.mjs';
 
 const ENEMY_TYPES = ['Imp', 'Cacodemon'];
-const IDLE_VARIANTS = ['reload', 'look', null];   // null = só respirar
+// Variações de idle (null = só respirar). Pesos iguais = o sorteio uniforme de antes.
+const IDLE_VARIANTS = [{ name: 'reload', weight: 1 }, { name: 'look', weight: 1 }, { name: null, weight: 1 }];
 const PET_RANGE_X = 90;      // px — distância horizontal para fazer carinho
 const PET_RANGE_Y = 70;      // px — diferença vertical máxima
 const PET_DURATION = 40;     // ticks (~2s)
@@ -46,8 +49,12 @@ export class DoomSlayer extends Gnomelet {
         this._petDuration       = 0;
         this._petTarget         = null;
         this._invuln            = 0;
+        this._guarding          = false;   // cursor parado há muito tempo: vem guardá-lo
 
         this._spawnProjectileCb = spawnProjectileCb ?? null;
+
+        this._idleVariants  = IDLE_VARIANTS;
+        this._stareReaction = 'look';   // o cursor parado por perto faz o Slayer olhar em volta
     }
 
     /** Inimigo vivo mais próximo (centro a centro), ou null. */
@@ -74,33 +81,6 @@ export class DoomSlayer extends Gnomelet {
             if (dx < PET_RANGE_X && dy < PET_RANGE_Y && dx < bestDx) { best = e; bestDx = dx; }
         }
         return best;
-    }
-
-    /** Parado por um tempo: às vezes recarrega a espingarda ou olha para os lados. */
-    _animationName() {
-        const name = super._animationName();
-        if (this._state !== State.IDLE) {
-            this._wasIdle = false;
-            this._idleVariant = null;
-            return name;
-        }
-        if (!this._wasIdle) {
-            this._wasIdle = true;
-            this._idleVariant = null;
-            // Pausas curtas são de combate (esperando o cooldown): ficam só respirando
-            if (this._idleTimer >= 20) {
-                const choice = IDLE_VARIANTS[Math.floor(Math.random() * IDLE_VARIANTS.length)];
-                const anim = this._frameImages?.animations?.[choice];
-                if (anim) {
-                    this._idleVariant = choice;
-                    this._idleVariantTicks = Math.ceil(anim.frames.length * anim.ticks);
-                    this._idleTimer = Math.max(this._idleTimer, this._idleVariantTicks + 20);
-                }
-            }
-        }
-        if (this._idleVariant && this._idleVariantTicks-- > 0) return this._idleVariant;
-        this._idleVariant = null;
-        return name;
     }
 
     takeDamage(amount) {
@@ -137,6 +117,27 @@ export class DoomSlayer extends Gnomelet {
         }
 
         this._currentTarget = null;
+
+        // Sem inimigos e com o cursor parado há ~30 s: vai até ele e fica de guarda
+        const ptr = this._pointer;
+        const guard = ptr ? guardMove({
+            still: ptr.still, afterTicks: GUARD_AFTER_TICKS,
+            selfX: this._x + this._displayW / 2, pointerX: ptr.x,
+        }) : { guarding: false, dir: 0 };
+        this._guarding = guard.guarding;
+        if (guard.guarding) {
+            if (guard.dir !== 0) {
+                this._state = State.WALKING;
+                this._vx = guard.dir * WALK_SPEED;
+            } else {
+                this._state = State.IDLE;
+                this._vx = 0;
+                this._idleTimer = 40 + Math.random() * 60;
+                this._savedFacing = facingToward(this._x + this._displayW / 2, ptr.x, this._savedFacing);
+            }
+            return;
+        }
+
         if (Math.random() < 0.6) {
             this._state = State.WALKING;
             this._vx = (Math.random() > 0.5 ? 1 : -1) * WALK_SPEED;
@@ -180,7 +181,9 @@ export class DoomSlayer extends Gnomelet {
         }
 
         // CHASING não tem lógica no Gnomelet base: reavalia o alvo a cada tick
-        if (this._state === State.CHASING) this._pickNewAction();
+        // (e a caminhada até o cursor, para parar ao chegar)
+        if (this._state === State.CHASING ||
+            (this._guarding && this._state === State.WALKING)) this._pickNewAction();
 
         // Só decide atacar quando está no chão agindo normalmente
         if (this._state === State.WALKING || this._state === State.CHASING || this._state === State.IDLE) {

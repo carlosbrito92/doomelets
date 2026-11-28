@@ -39,6 +39,22 @@ function rectOf(w) {
     return { x: Math.floor(g.x), y: Math.floor(g.y), width: Math.floor(g.width), height: Math.floor(g.height) };
 }
 
+/** Retângulo da janela se ela é uma superfície viva e visível agora; senão null. */
+export function liveRect(w, workspace) {
+    if (!w || isOwnWindow(w) || !isShown(w, workspace) || !isSurface(w)) return null;
+    return rectOf(w);
+}
+
+/** Retângulo de uma janela que está saindo (fechando/minimizando); null se não der para ler. */
+export function departingRect(w) {
+    try {
+        if (!w || isOwnWindow(w) || !isSurface(w)) return null;
+        return rectOf(w);
+    } catch (e) {
+        return null;
+    }
+}
+
 /**
  * floorMode: 'allow' | 'partial' | 'disallow' (mesmo significado da chave floor-z-order).
  * Retorna { windows, forceBackground, stack } — `stack` são as janelas visíveis de baixo
