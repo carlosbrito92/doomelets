@@ -13,7 +13,7 @@ import { DoomSlayer } from './characters/doom-slayer.js';
 import { Projectile } from './projectile.js';
 import { Portal } from './portal.js';
 import { PointerTracker, PortalGate } from './behavior.js';
-import { NOTICE_RANGE, PORTAL_DEMON_TTL } from './utils.js';
+import { NOTICE_RANGE, PORTAL_DEMON_TTL, DEFAULT_TYPES } from './utils.js';
 import { isWindowMaximized, UPDATE_INTERVAL_MS } from './utils.js';
 
 const SLAYER = 'DoomSlayer';   // sempre exatamente um em cena quando selecionado
@@ -86,7 +86,7 @@ export const GnomeletManager = GObject.registerClass(
          */
         async _loadResourcesAndSpawn(hardReset = false) {
             let types = this._settings.get_strv('gnomelet-type');
-            if (!types || types.length === 0) types = ['Santa'];
+            if (!types || types.length === 0) types = DEFAULT_TYPES;
 
             let loadedSomething = false;
 
@@ -166,6 +166,18 @@ export const GnomeletManager = GObject.registerClass(
 
             // Load all selected types
             await Promise.all(types.map(t => loadType(t)));
+
+            // Seleção salva com personagens que não existem mais (ex.: os originais removidos):
+            // troca pelo padrão uma vez; o 'changed' do GSettings recarrega tudo.
+            if (!types.some(t => this._resources[t])) {
+                if (!this._typesMigrated) {
+                    this._typesMigrated = true;
+                    this._settings.set_strv('gnomelet-type', DEFAULT_TYPES);
+                } else {
+                    console.warn('Doomelets: nenhum personagem selecionado foi encontrado em images/');
+                }
+                return;
+            }
 
             if (hardReset) this._hardReset();
             else this._spawnGnomelets(null);
@@ -376,7 +388,7 @@ export const GnomeletManager = GObject.registerClass(
 
             // Random from selected
             let selectedTypes = this._settings.get_strv('gnomelet-type');
-            if (!selectedTypes || selectedTypes.length === 0) selectedTypes = ['Santa'];
+            if (!selectedTypes || selectedTypes.length === 0) selectedTypes = DEFAULT_TYPES;
             // Filter those that are actually loaded
             let valid = selectedTypes.filter(t => t !== SLAYER && this._resources[t] &&
                 !(originalsOnly && DEMONS.includes(t)));

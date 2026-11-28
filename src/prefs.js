@@ -44,7 +44,7 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
                 }
 
                 types.sort();
-                if (types.length === 0) types.push('Santa');
+                if (types.length === 0) types.push('DoomSlayer', 'Imp', 'Cacodemon');
 
                 // Get currently selected types (array of strings)
                 let currentTypes = settings.get_strv('gnomelet-type');

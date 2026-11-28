@@ -150,7 +150,7 @@ test('manager: janela que sumiu antes do primeiro frame ou pequena demais não a
 });
 
 test('manager: só solta tipos selecionados', () => {
-    const { m, rects } = manager(['Santa']);
+    const { m, rects } = manager(['Custom']);
     const win = {}; rects.set(win, { x: 0, y: 0, width: 900, height: 600 });
     m.onWindowAdded(win);
     for (let i = 0; i < 10; i++) m.tick();
@@ -212,4 +212,11 @@ test('PortalGate explica por que não abriu (lastReason), para o log', async () 
     assert.equal(h.consider(1), null); assert.equal(h.lastReason, 'teto de demônios de portal');
     assert.equal(h.consider(0, () => false), null); assert.equal(h.lastReason, 'nenhum tipo disponível');
     assert.ok(h.consider(0)); assert.equal(h.consider(0), null); assert.equal(h.lastReason, 'intervalo');
+});
+
+test('manager (KWin): sem seleção usa os personagens padrão (e nunca o Slayer no sorteio)', () => {
+    const { m } = manager([]);
+    const types = new Set();
+    for (let i = 0; i < 40; i++) types.add(m._pickResource().type);
+    assert.deepEqual([...types].sort(), ['Cacodemon', 'Imp']);
 });

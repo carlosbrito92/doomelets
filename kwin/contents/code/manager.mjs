@@ -17,7 +17,7 @@ import { DoomSlayer } from './characters/doom-slayer.mjs';
 import { Projectile } from './projectile.mjs';
 import { Portal } from './portal.mjs';
 import { PointerTracker, PortalGate } from './behavior.mjs';
-import { NOTICE_RANGE, PORTAL_DEMON_TTL } from './utils.mjs';
+import { NOTICE_RANGE, PORTAL_DEMON_TTL, DEFAULT_TYPES } from './utils.mjs';
 
 const SLAYER = 'DoomSlayer';   // sempre exatamente um em cena quando selecionado
 const DEMONS = ['Imp', 'Cacodemon'];
@@ -60,7 +60,7 @@ export class GnomeletManager {
 
     _loadResourcesAndSpawn(hardReset = false) {
         let types = this._settings.get_strv('gnomelet-type');
-        if (!types || types.length === 0) types = ['Santa'];
+        if (!types || types.length === 0) types = DEFAULT_TYPES;
         types.forEach(t => this._loadType(t));
 
         if (hardReset) this._hardReset();
@@ -112,7 +112,7 @@ export class GnomeletManager {
         }
 
         let selectedTypes = this._settings.get_strv('gnomelet-type');
-        if (!selectedTypes || selectedTypes.length === 0) selectedTypes = ['Santa'];
+        if (!selectedTypes || selectedTypes.length === 0) selectedTypes = DEFAULT_TYPES;
         let valid = selectedTypes.filter(t => t !== SLAYER && this._resources[t] &&
             !(originalsOnly && DEMONS.includes(t)));
         if (valid.length === 0) return null;

@@ -52,23 +52,5 @@
     <entry name="TypeCacodemon" type="bool">
       <default>true</default>
     </entry>
-    <entry name="TypeKitten" type="bool">
-      <default>false</default>
-    </entry>
-    <entry name="TypeMouse" type="bool">
-      <default>false</default>
-    </entry>
-    <entry name="TypePuppy" type="bool">
-      <default>false</default>
-    </entry>
-    <entry name="TypeSanta" type="bool">
-      <default>false</default>
-    </entry>
-    <entry name="TypeSquirrel" type="bool">
-      <default>false</default>
-    </entry>
-    <entry name="TypeTux" type="bool">
-      <default>false</default>
-    </entry>
   </group>
 </kcfg>
