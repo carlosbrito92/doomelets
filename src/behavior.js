@@ -104,26 +104,31 @@ export class PointerTracker {
 
 /**
  * Decide se uma janela nova abre um portal e que demônio sai dele.
- * Respeita intervalo mínimo (em ticks), chance e teto de demônios ativos.
+ * Respeita intervalo mínimo (em ticks), chance e teto de demônios *de portal* vivos
+ * (`maxActive`; os demônios normais da contagem do usuário não entram na conta).
+ * `lastReason` diz por que a última consulta não abriu portal (para o log).
  */
 export class PortalGate {
-    constructor({ cooldown = 400, chance = 0.5, maxActive = 5, weights = { Imp: 3, Cacodemon: 1 } } = {}, rng = Math.random) {
+    constructor({ cooldown = 400, chance = 0.5, maxActive = 3, weights = { Imp: 3, Cacodemon: 1 } } = {}, rng = Math.random) {
         Object.assign(this, { cooldown, chance, maxActive, weights, rng });
         this._cool = 0;
+        this.lastReason = '';
     }
 
     tick() { if (this._cool > 0) this._cool--; }
 
     /** Devolve o nome do demônio a soltar, ou null. `available(nome)` filtra o que está carregado/selecionado. */
     consider(active, available = () => true) {
-        if (this._cool > 0 || active >= this.maxActive || this.rng() >= this.chance) return null;
+        if (this._cool > 0) { this.lastReason = 'intervalo'; return null; }
+        if (active >= this.maxActive) { this.lastReason = 'teto de demônios de portal'; return null; }
+        if (this.rng() >= this.chance) { this.lastReason = 'sem sorte'; return null; }
         const pool = Object.entries(this.weights).filter(([n]) => available(n));
         const total = pool.reduce((s, [, w]) => s + w, 0);
-        if (total <= 0) return null;
+        if (total <= 0) { this.lastReason = 'nenhum tipo disponível'; return null; }
         let r = this.rng() * total;
         for (const [name, w] of pool) {
             r -= w;
-            if (r < 0) { this._cool = this.cooldown; return name; }
+            if (r < 0) { this._cool = this.cooldown; this.lastReason = ''; return name; }
         }
         return null;
     }

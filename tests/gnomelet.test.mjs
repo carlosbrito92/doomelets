@@ -206,3 +206,13 @@ test('manager: evento de janela faz os próximos olharem, os distantes não', ()
     assert.equal(near._state, State.IDLE);
     assert.equal(far._state, State.WALKING);
 });
+
+test('manager (GNOME): com 7 demônios já em cena (contagem do usuário) ainda abre portal; teto de 3 só para os de portal', () => {
+    const m = manager();
+    for (let i = 0; i < 6; i++) m._gnomelets.push(make(Imp, 'Imp'));
+    m._gnomelets.push(make(Cacodemon, 'Cacodemon'));
+    m._portalGate.cooldown = 0;
+    const rect = { x: 200, y: 300, width: 900, height: 600 };
+    for (let k = 0; k < 6; k++) m._portalDemon(rect);
+    assert.equal(m._gnomelets.filter(g => g._ephemeral).length, 3);
+});
