@@ -19,7 +19,7 @@ import "../code/sprites.mjs" as Sprites
 Item {
     id: root
 
-    readonly property var characterTypes: ["DoomSlayer", "Imp", "Cacodemon", "Kitten", "Mouse", "Puppy", "Santa", "Squirrel", "Tux"]
+    readonly property var characterTypes: ["DoomSlayer", "Imp", "Cacodemon"]
     readonly property var floorModes: ["allow", "partial", "disallow"]
 
     property var manager: null

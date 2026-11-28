@@ -15,6 +15,8 @@ export const NOTICE_RANGE = 700;
 export const NOTICE_PAUSE_TICKS = 30;
 export const PORTAL_DEMON_TTL = 2400;
 export const GUARD_AFTER_TICKS = 600;
+// Personagens selecionados quando nada está selecionado nas configurações
+export const DEFAULT_TYPES = ['DoomSlayer', 'Imp', 'Cacodemon'];
 export const GRAVITY = 2;             // Vertical acceleration per frame
 export const WALK_SPEED = 3;          // Horizontal pixels per frame
 

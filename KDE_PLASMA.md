@@ -76,7 +76,7 @@ Open **Doomelets Settings** from the application menu, press `Meta+Ctrl+S`, or u
 | | Allow dragging and throwing | On | Off by default on GNOME |
 | Doom combat | Demons come back after | 5 to 10 s | Random wait before a dead Imp or Cacodemon returns |
 | | Doom Slayer / Imp / Cacodemon health | 12 / 3 / 5 HP | |
-| Characters | Character selection | Doom Slayer, Imp, Cacodemon | Any mix of the Doom and original characters |
+| Characters | Character selection | Doom Slayer, Imp, Cacodemon | Any mix of the three Doom characters |
 
 **In front of maximized windows:**
 

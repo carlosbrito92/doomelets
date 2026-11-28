@@ -180,7 +180,7 @@ test('manager: janela nova solta um demônio efêmero com portal; o portão resp
 });
 
 test('manager: não solta demônio que o usuário não selecionou', () => {
-    const m = manager(['Santa'], () => 0);
+    const m = manager(['Custom'], () => 0);
     assert.equal(m._portalDemon({ x: 0, y: 0, width: 900, height: 600 }), null);
     assert.equal(m._gnomelets.length, 0);
 });
@@ -215,4 +215,11 @@ test('manager (GNOME): com 7 demônios já em cena (contagem do usuário) ainda 
     const rect = { x: 200, y: 300, width: 900, height: 600 };
     for (let k = 0; k < 6; k++) m._portalDemon(rect);
     assert.equal(m._gnomelets.filter(g => g._ephemeral).length, 3);
+});
+
+test('manager (GNOME): sem seleção salva usa os personagens padrão (e nunca o Slayer no sorteio)', () => {
+    const m = manager([]);
+    const types = new Set();
+    for (let i = 0; i < 40; i++) types.add(m._pickResource().type);
+    assert.deepEqual([...types].sort(), ['Cacodemon', 'Imp']);
 });

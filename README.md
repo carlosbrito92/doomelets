@@ -12,13 +12,13 @@ The desktop pet engine (physics, window and dock interaction, multi-monitor supp
 
 * **Three Doom characters:** the Doom Slayer, the Imp and the Cacodemon, each with its own class and AI.
 * **Combat:** hit points, projectiles, hurt and death states, and glory kills.
-* **Interaction with the original characters:** the Doom Slayer stops to pet them.
+* **Companions:** the Doom Slayer stops to pet any non-Doom character (a custom one you add, see below).
 * **Smoother animation:** an optional `animations.json` manifest allows any number of frames per animation.
 * **New animations:** a "held" pose while a Doom character is dragged, and idle variations for the Doom Slayer.
 * **Sprite pipeline:** three.js rigs and a script that renders them to PNG frames.
 * **Its own extension identity:** UUID `doomelets@carlosbrito92.github.com` and settings schema `org.gnome.shell.extensions.doomelets`.
 
-The original characters (Kitten, Mouse, Puppy, Santa, Squirrel and Tux) are still included.
+The six characters inherited from Gnomelets (Kitten, Mouse, Puppy, Santa, Squirrel and Tux) were removed. Their role, harmless companions the Slayer can pet, will be taken by new built-in characters (Daisy, Pinky and Lost Soul), still to come. Until then the Slayer has nobody to pet unless you add your own character folder.
 
 ## Doom characters
 
@@ -31,7 +31,7 @@ The original characters (Kitten, Mouse, Puppy, Santa, Squirrel and Tux) are stil
 * When `DoomSlayer` is selected, there is **always exactly one** on screen. It counts toward the character count, and the remaining slots are filled with the other selected types.
 * If the Slayer dies, it respawns after about one second and is briefly invulnerable.
 * Dead Imps and Cacodemons come back from the screen edge after 5 to 10 seconds, as long as their type is still selected.
-* When no demon is in range, the Slayer pets original characters that pass nearby. Demons ignore them, and the original characters cannot be damaged.
+* When no demon is in range, the Slayer pets non-Doom characters that pass nearby (custom ones, for now). Demons ignore them, and they cannot be damaged.
 * While standing still, the Slayer sometimes reloads the shotgun or looks around.
 
 ## Features inherited from Gnomelets
@@ -77,7 +77,7 @@ Restart GNOME Shell so it finds the extension (log out and back in on Wayland; p
 gnome-extensions enable doomelets@carlosbrito92.github.com
 ```
 
-Open the extension preferences and select `DoomSlayer`, `Imp` and `Cacodemon`. The default selection is `Santa`.
+Open the extension preferences and select `DoomSlayer`, `Imp` and `Cacodemon`. The default selection is those three.
 
 The metadata declares support for GNOME Shell 45 to 50.
 

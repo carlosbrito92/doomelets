@@ -307,48 +307,6 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="0">
-       <widget class="QCheckBox" name="kcfg_TypeKitten">
-        <property name="text">
-         <string>Kitten</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QCheckBox" name="kcfg_TypeMouse">
-        <property name="text">
-         <string>Mouse</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="2">
-       <widget class="QCheckBox" name="kcfg_TypePuppy">
-        <property name="text">
-         <string>Puppy</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QCheckBox" name="kcfg_TypeSanta">
-        <property name="text">
-         <string>Santa</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QCheckBox" name="kcfg_TypeSquirrel">
-        <property name="text">
-         <string>Squirrel</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="2">
-       <widget class="QCheckBox" name="kcfg_TypeTux">
-        <property name="text">
-         <string>Tux</string>
-        </property>
-       </widget>
-      </item>
      </layout>
     </widget>
    </item>

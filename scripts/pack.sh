@@ -17,7 +17,7 @@ glib-compile-schemas --strict "$SRC_DIR/schemas/"
 echo "📦 Packaging from $SRC_DIR..."
 cd "$SRC_DIR"
 zip -qr "$ZIP_FILE" extension.js prefs.js metadata.json manager.js gnomelet.js \
-    indicator.js utils.js projectile.js characters schemas images
+    indicator.js utils.js projectile.js behavior.js motion.js portal.js characters schemas images
 
 cd "$PROJECT_ROOT"
 zip -q "$ZIP_FILE" README.md LICENSE
