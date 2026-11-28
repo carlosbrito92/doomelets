@@ -161,6 +161,13 @@ node --test tests/behavior.test.mjs
 node --import ./tests/support/register.mjs --test tests/gnomelet.test.mjs
 ```
 
+Window events and scenes:
+
+* **Portals:** opening a window sometimes (50%, at most every ~20 s, up to 5 demons alive) opens a fire portal on its top edge and drops an Imp or Cacodemon, but only types selected in the preferences. These demons leave through another portal after about 2 minutes and do not respawn.
+* **Attention:** a window opening, closing or minimizing makes nearby walking or idle characters stop and look toward it for ~1.5 s (the `look` / `taunt` reaction plays if the manifest has it).
+* **Cowardly Imp:** at 1 hit point the Imp runs away from the Doom Slayer instead of fighting, unless cornered at a screen edge.
+* **Guarding the cursor:** if the mouse has not moved for ~30 s and there are no enemies, the Doom Slayer walks over and stands guard next to it.
+
 Pointer interaction: a character left idle near the cursor turns to face it; after about 3 s it plays its `stare` reaction (`look` for the Doom Slayer, `taunt` for the Imp once that animation exists in its manifest). The Cacodemon drifts toward the cursor but keeps its distance. Movement between logic ticks (20 Hz) is interpolated, so motion on screen is continuous.
 
 To regenerate the Doom sprites (needs the Python packages `playwright` and `pillow`, plus a Playwright browser):

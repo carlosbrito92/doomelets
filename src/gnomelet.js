@@ -20,6 +20,7 @@ import {
     CURIOSITY_NOTICE_TICKS,
     CURIOSITY_STARE_TICKS,
     IDLE_VARIANT_MIN_TICKS,
+    NOTICE_PAUSE_TICKS,
 } from './utils.js';
 import { IdleScheduler, Curiosity, facingToward } from './behavior.js';
 import { placeActor, resetMotion } from './motion.js';
@@ -820,20 +821,64 @@ export const Gnomelet = GObject.registerClass(
          * Chamado pelo Manager a cada tick com a posição do ponteiro.
          * Calcula a curiosidade e reage quando o nível muda.
          */
-        observePointer(px, py) {
+        observePointer(px, py, still = 0) {
             if (!this.actor) return;
             this._idleSched?.tick();
             const cx = this._x + this._displayW / 2, cy = this._y + this._displayH / 2;
             const dist = Math.hypot(px - cx, py - cy);
             const before = this._curiosity.level;
             const level = this._curiosity.update(dist);
-            this._pointer = { x: px, y: py, dist, level };
+            this._pointer = { x: px, y: py, dist, level, still };
             if (this._state === State.IDLE && level >= 1) {
                 this._savedFacing = facingToward(cx, px, this._savedFacing);
             }
             if (level === 2 && before < 2 && this._stareReaction) {
                 this._playIdleVariant(this._stareReaction);
             }
+        }
+
+        /**
+         * Algo aconteceu em (px, py) — uma janela abriu, fechou ou minimizou: para e olha para lá.
+         * Só reage quem está andando ou parado; em combate/flutuando ignora.
+         */
+        notice(px, py) {
+            if (!this.actor || this._isDead) return false;
+            if (this._state !== State.WALKING && this._state !== State.IDLE) return false;
+            const cx = this._x + this._displayW / 2;
+            this._savedFacing = facingToward(cx, px, this._savedFacing);
+            this._state = State.IDLE;
+            this._vx = 0;
+            this._idleTimer = Math.max(this._idleTimer, NOTICE_PAUSE_TICKS);
+            this._wasIdle = false;
+            this._idleVariant = null;
+            this._playIdleVariant(this._stareReaction);
+            return true;
+        }
+
+        /** Aparece suavemente (fade-in). */
+        _fadeIn(ms = 400) {
+            this.actor.opacity = 0;
+            this.actor.save_easing_state();
+            this.actor.set_easing_duration(ms);
+            this.actor.set_easing_mode(Clutter.AnimationMode.EASE_OUT_QUAD);
+            this.actor.opacity = 255;
+            this.actor.restore_easing_state();
+        }
+
+        /**
+         * Entra em cena pousando no topo de uma janela (saída de portal).
+         * Devolve o centro do personagem, onde o portal deve abrir.
+         */
+        arriveAt(rect) {
+            this._x = rect.x + Math.random() * Math.max(1, rect.width - this._displayW);
+            this._y = rect.y - this._displayH;
+            this._vx = 0;
+            this._vy = 0;
+            this._state = State.SPAWNING;
+            this._spawnTimer = 8;
+            this._fadeIn();
+            this._placeActor(true);
+            return { x: this._x + this._displayW / 2, y: this._y + this._displayH / 2 };
         }
 
         /** Nome da animação do manifesto correspondente ao estado atual. */

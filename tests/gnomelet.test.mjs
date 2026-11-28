@@ -97,3 +97,112 @@ test('Cacodemon sem cursor por perto continua à deriva e rebate nas bordas', ()
     for (let i = 0; i < 200; i++) { c.observePointer(-5000, -5000); c.update([], false, null, [], []); }
     assert.ok(c._floatSpeedX < 0 && c._x < 1900);
 });
+
+// ---------- cenas e eventos de janela ----------
+import { GnomeletManager } from '../src/manager.js';
+import { guardMove } from '../src/behavior.js';
+
+test('Imp com pouca vida foge do Slayer (corre para longe) e com vida cheia luta', () => {
+    const imp = make(Imp, 'Imp'); ground(imp); imp._x = 800;
+    const slayer = make(DoomSlayer, 'DoomSlayer'); ground(slayer); slayer._x = 600;
+    imp._allEntities = [slayer, imp];
+    imp._hp = 1; imp._pickNewAction();
+    assert.equal(imp._state, State.CHASING);
+    assert.ok(imp._vx > 0, 'foge para a direita, longe do Slayer à esquerda');
+    imp._hp = 3; imp._pickNewAction();
+    assert.equal(imp._fleeing, false);
+});
+
+test('Slayer com o cursor parado ~30 s anda até ele e fica de guarda olhando para ele', () => {
+    const s = make(DoomSlayer, 'DoomSlayer'); ground(s); s._x = 100;
+    s._allEntities = [s];
+    s._pointer = { x: 1200, y: 900, dist: 1000, level: 0, still: 700 };
+    s._pickNewAction();
+    assert.equal(s._state, State.WALKING); assert.ok(s._vx > 0); assert.equal(s._guarding, true);
+    s._x = 1150;                                         // chegou (a menos de 140 px do centro)
+    s._x = 1200 - s._displayW / 2 - 50;
+    s._pickNewAction();
+    assert.equal(s._state, State.IDLE); assert.equal(s._savedFacing, true);
+    s._pointer.still = 5;                                // mexeu o mouse: volta ao normal
+    s._pickNewAction();
+    assert.equal(s._guarding, false);
+});
+
+test('notice: personagem andando para, vira para o evento e fica parado um instante', () => {
+    const imp = make(Imp, 'Imp'); ground(imp); imp._x = 500;
+    imp._state = State.WALKING; imp._vx = -4; imp._savedFacing = false;
+    assert.equal(imp.notice(1500, 400), true);
+    assert.equal(imp._state, State.IDLE); assert.equal(imp._vx, 0); assert.equal(imp._savedFacing, true);
+    assert.ok(imp._idleTimer >= 30);
+    imp._state = State.THROWING;                         // em combate: ignora
+    assert.equal(imp.notice(0, 0), false);
+});
+
+test('notice: Slayer toca "look" se o manifesto tiver', () => {
+    const s = make(DoomSlayer, 'DoomSlayer'); ground(s); s._state = State.WALKING;
+    s.notice(1500, 400);
+    assert.equal(s._idleVariant, 'look');
+});
+
+test('arriveAt: Imp pousa no topo da janela; Cacodemon surge flutuando sobre ela', () => {
+    const rect = { x: 300, y: 400, width: 800, height: 500 };
+    const imp = make(Imp, 'Imp');
+    const at = imp.arriveAt(rect);
+    assert.equal(imp._state, State.SPAWNING);
+    assert.equal(imp._y + imp._displayH, 400);           // pés na borda superior
+    assert.ok(imp._x >= 300 && imp._x <= 1100);
+    assert.ok(at.x > 300 && at.y < 400);
+    const caco = make(Cacodemon, 'Cacodemon');
+    caco.arriveAt(rect);
+    assert.equal(caco._state, State.SPAWNING);
+    assert.ok(Math.abs(caco._x + caco._displayW / 2 - 700) < 1);
+});
+
+function manager(strv = ['Imp', 'Cacodemon', 'DoomSlayer'], rng = () => 0) {
+    const st = { ...settings, get_strv: () => strv };
+    const m = new GnomeletManager(st);
+    m._isPaused = false;
+    for (const n of ['Imp', 'Cacodemon', 'DoomSlayer']) {
+        const f = frames(n); m._resources[n] = { frames: f, w: 144, h: 153 };
+    }
+    m._portalGate.rng = rng; m._portalGate.chance = 1;
+    return m;
+}
+
+test('manager: janela nova solta um demônio efêmero com portal; o portão respeita intervalo e teto', () => {
+    const m = manager();
+    const rect = { x: 200, y: 300, width: 900, height: 600 };
+    const d = m._portalDemon(rect);
+    assert.ok(d && ['Imp', 'Cacodemon'].includes(d._typeName));
+    assert.equal(d._ephemeral, true); assert.equal(d._portalTtl, 2400);
+    assert.equal(m._portals.length, 1); assert.equal(m._gnomelets.length, 1);
+    assert.equal(m._portalDemon(rect), null, 'em intervalo');
+});
+
+test('manager: não solta demônio que o usuário não selecionou', () => {
+    const m = manager(['Santa'], () => 0);
+    assert.equal(m._portalDemon({ x: 0, y: 0, width: 900, height: 600 }), null);
+    assert.equal(m._gnomelets.length, 0);
+});
+
+test('manager: demônio de portal some depois do TTL, com portal de saída e sem renascer', () => {
+    const m = manager();
+    const d = m._portalDemon({ x: 200, y: 300, width: 900, height: 600 });
+    d._portalTtl = 2;
+    m._updateEphemeral(); assert.equal(d._markedForRemoval, false);
+    m._updateEphemeral(); assert.equal(d._markedForRemoval, true);
+    assert.equal(m._portals.length, 2);                  // entrada + saída
+    for (let i = 0; i < 20; i++) m._updatePortals();     // os portais terminam
+    assert.equal(m._portals.length, 0);
+    assert.equal(m._demonQueue.length, 0);
+});
+
+test('manager: evento de janela faz os próximos olharem, os distantes não', () => {
+    const m = manager();
+    const near = make(Imp, 'Imp'); ground(near); near._x = 500; near._state = State.WALKING;
+    const far = make(Imp, 'Imp'); ground(far); far._x = 1800; far._state = State.WALKING;
+    m._gnomelets.push(near, far);
+    m._noticeAround(600, near._y);
+    assert.equal(near._state, State.IDLE);
+    assert.equal(far._state, State.WALKING);
+});

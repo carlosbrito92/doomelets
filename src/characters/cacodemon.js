@@ -162,6 +162,20 @@ export const Cacodemon = GObject.registerClass(
             this._spawnProjectileCb(sx, sy, (tx - sx) / len * 7, (ty - sy) / len * 7, 2);
         }
 
+        /** Saída de portal: surge flutuando na altura habitual, acima da janela nova. */
+        arriveAt(rect) {
+            const monitor = Main.layoutManager.primaryMonitor;
+            this._x = rect.x + rect.width / 2 - this._displayW / 2;
+            this._y = monitor.y + monitor.height * 0.25;
+            this._floatSpeedX = (Math.random() > 0.5 ? 1 : -1) * 1.5;
+            this._velX = this._floatSpeedX;
+            this._state = State.SPAWNING;
+            this._spawnTimer = 8;
+            this._fadeIn();
+            this._placeActor(true);
+            return { x: this._x + this._displayW / 2, y: this._y + this._displayH / 2 };
+        }
+
         /** Entra flutuando por uma das bordas (a altura é definida pelo update). */
         enterFromEdge(fromLeft) {
             this._x = fromLeft ? 0 : global.stage.width - this._displayW;

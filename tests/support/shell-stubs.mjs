@@ -34,7 +34,9 @@ const stub = {
     Icon: class extends FakeActor {}, Widget: class extends FakeActor {},
     ThemeContext: { get_for_stage: () => ({ scale_factor: 1 }) },
     BinLayout: class {}, Actor: FakeActor,
-    AnimationMode: { LINEAR: 1 }, WindowType: { NORMAL: 0 },
+    AnimationMode: { LINEAR: 1, EASE_OUT_QUAD: 2 }, WindowType: { NORMAL: 0 },
+    get_user_cache_dir: () => '/tmp', timeout_add: () => 1, source_remove() {},
+    SOURCE_REMOVE: false, SOURCE_CONTINUE: true, PRIORITY_DEFAULT: 0,
 };
 export default stub;
 

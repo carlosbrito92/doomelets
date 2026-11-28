@@ -1,9 +1,11 @@
 import GObject from 'gi://GObject';
 import { Gnomelet } from '../gnomelet.js';
+import { guardMove, facingToward } from '../behavior.js';
 import {
     State,
     WALK_SPEED,
     SLAYER_CHASE_SPEED,
+    GUARD_AFTER_TICKS,
 } from '../utils.js';
 
 const ENEMY_TYPES = ['Imp', 'Cacodemon'];
@@ -48,6 +50,7 @@ export const DoomSlayer = GObject.registerClass(
             this._petDuration       = 0;
             this._petTarget         = null;
             this._invuln            = 0;
+            this._guarding          = false;   // cursor parado há muito tempo: vem guardá-lo
 
             this._spawnProjectileCb = spawnProjectileCb ?? null;
 
@@ -115,6 +118,27 @@ export const DoomSlayer = GObject.registerClass(
             }
 
             this._currentTarget = null;
+
+            // Sem inimigos e com o cursor parado há ~30 s: vai até ele e fica de guarda
+            const ptr = this._pointer;
+            const guard = ptr ? guardMove({
+                still: ptr.still, afterTicks: GUARD_AFTER_TICKS,
+                selfX: this._x + this._displayW / 2, pointerX: ptr.x,
+            }) : { guarding: false, dir: 0 };
+            this._guarding = guard.guarding;
+            if (guard.guarding) {
+                if (guard.dir !== 0) {
+                    this._state = State.WALKING;
+                    this._vx = guard.dir * WALK_SPEED;
+                } else {
+                    this._state = State.IDLE;
+                    this._vx = 0;
+                    this._idleTimer = 40 + Math.random() * 60;
+                    this._savedFacing = facingToward(this._x + this._displayW / 2, ptr.x, this._savedFacing);
+                }
+                return;
+            }
+
             if (Math.random() < 0.6) {
                 this._state = State.WALKING;
                 this._vx = (Math.random() > 0.5 ? 1 : -1) * WALK_SPEED;
@@ -161,7 +185,9 @@ export const DoomSlayer = GObject.registerClass(
             }
 
             // CHASING não tem lógica no Gnomelet base: reavalia o alvo a cada tick
-            if (this._state === State.CHASING) this._pickNewAction();
+            // (e a caminhada até o cursor, para parar ao chegar)
+            if (this._state === State.CHASING ||
+                (this._guarding && this._state === State.WALKING)) this._pickNewAction();
 
             // Só decide atacar quando está no chão agindo normalmente
             if (this._state === State.WALKING || this._state === State.CHASING || this._state === State.IDLE) {

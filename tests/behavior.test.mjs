@@ -77,3 +77,46 @@ test('Curiosity: ao se afastar decai devagar e volta a 0', () => {
     for (let i = 0; i < 10; i++) c.update(900);
     assert.equal(c.level, 0);
 });
+
+import { PointerTracker, PortalGate, fleeDirection, guardMove } from '../src/behavior.js';
+
+test('PointerTracker: conta ticks parado e zera ao mexer', () => {
+    const t = new PointerTracker();
+    assert.equal(t.update(100, 100), 0);
+    assert.equal(t.update(101, 100), 1);          // dentro da tolerância
+    assert.equal(t.update(100, 101), 2);
+    assert.equal(t.update(300, 100), 0);          // moveu
+});
+
+test('PortalGate: intervalo, teto de demônios, chance e disponibilidade', () => {
+    const g = new PortalGate({ cooldown: 3, chance: 1, maxActive: 2, weights: { Imp: 1, Cacodemon: 1 } }, seq(0.0, 0.0, 0.0));
+    assert.equal(g.consider(0), 'Imp');
+    assert.equal(g.consider(0), null);            // em intervalo
+    g.tick(); g.tick(); g.tick();
+    assert.equal(g.consider(2), null);            // teto atingido
+    assert.equal(g.consider(1, n => n === 'Cacodemon'), 'Cacodemon');   // só o disponível
+    const none = new PortalGate({ chance: 0 });
+    assert.equal(none.consider(0), null);
+});
+
+test('PortalGate: sem nada disponível não abre portal', () => {
+    assert.equal(new PortalGate({ chance: 1 }, seq(0)).consider(0, () => false), null);
+});
+
+test('fleeDirection: só com pouca vida, longe da borda e dentro do raio', () => {
+    const base = { maxHp: 3, selfX: 800, threatX: 600, dist: 200, screenW: 1920 };
+    assert.equal(fleeDirection({ ...base, hp: 3 }), 0);          // saudável: luta
+    assert.equal(fleeDirection({ ...base, hp: 1 }), 1);          // ameaça à esquerda: foge para a direita
+    assert.equal(fleeDirection({ ...base, hp: 1, threatX: 1000 }), -1);
+    assert.equal(fleeDirection({ ...base, hp: 1, dist: 400 }), 0);                  // fora do raio
+    assert.equal(fleeDirection({ ...base, hp: 1, dist: 400, fleeing: true }), 1);   // histerese
+    assert.equal(fleeDirection({ ...base, hp: 1, selfX: 1900 }), 0);                // encurralado
+    assert.equal(fleeDirection({ ...base, hp: 0 }), 0);
+});
+
+test('guardMove: só depois de muito tempo parado; chega e fica', () => {
+    assert.deepEqual(guardMove({ still: 100, selfX: 0, pointerX: 900 }), { guarding: false, dir: 0 });
+    assert.deepEqual(guardMove({ still: 600, selfX: 0, pointerX: 900 }), { guarding: true, dir: 1 });
+    assert.deepEqual(guardMove({ still: 600, selfX: 1000, pointerX: 900 }), { guarding: true, dir: 0 });
+    assert.deepEqual(guardMove({ still: 900, selfX: 900, pointerX: 100 }), { guarding: true, dir: -1 });
+});

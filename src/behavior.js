@@ -84,3 +84,72 @@ export class Curiosity {
         return 0;
     }
 }
+
+/** Quantos ticks seguidos o ponteiro está (quase) parado. */
+export class PointerTracker {
+    constructor(tolerance = 2) {
+        this.tolerance = tolerance;
+        this.still = 0;
+        this._x = null;
+        this._y = null;
+    }
+
+    update(x, y) {
+        const moved = this._x === null || Math.abs(x - this._x) + Math.abs(y - this._y) > this.tolerance;
+        this._x = x; this._y = y;
+        this.still = moved ? 0 : this.still + 1;
+        return this.still;
+    }
+}
+
+/**
+ * Decide se uma janela nova abre um portal e que demônio sai dele.
+ * Respeita intervalo mínimo (em ticks), chance e teto de demônios ativos.
+ */
+export class PortalGate {
+    constructor({ cooldown = 400, chance = 0.5, maxActive = 5, weights = { Imp: 3, Cacodemon: 1 } } = {}, rng = Math.random) {
+        Object.assign(this, { cooldown, chance, maxActive, weights, rng });
+        this._cool = 0;
+    }
+
+    tick() { if (this._cool > 0) this._cool--; }
+
+    /** Devolve o nome do demônio a soltar, ou null. `available(nome)` filtra o que está carregado/selecionado. */
+    consider(active, available = () => true) {
+        if (this._cool > 0 || active >= this.maxActive || this.rng() >= this.chance) return null;
+        const pool = Object.entries(this.weights).filter(([n]) => available(n));
+        const total = pool.reduce((s, [, w]) => s + w, 0);
+        if (total <= 0) return null;
+        let r = this.rng() * total;
+        for (const [name, w] of pool) {
+            r -= w;
+            if (r < 0) { this._cool = this.cooldown; return name; }
+        }
+        return null;
+    }
+}
+
+/**
+ * Covardia do Imp: com pouca vida ele foge do ameaçador em vez de lutar.
+ * Devolve a direção de fuga (+1 direita, -1 esquerda) ou 0 (lutar). Histerese evita ficar
+ * alternando na borda do raio; encurralado na borda da tela, ele enfrenta.
+ */
+export function fleeDirection({ hp, maxHp, selfX, threatX, dist, fleeing = false,
+                                screenW, margin = 80, range = 350, hysteresis = 1.3 }) {
+    const scared = hp > 0 && hp <= Math.max(1, Math.floor(maxHp / 3));
+    if (!scared || dist >= (fleeing ? range * hysteresis : range)) return 0;
+    const dir = selfX >= threatX ? 1 : -1;
+    if ((dir > 0 && selfX > screenW - margin) || (dir < 0 && selfX < margin)) return 0;
+    return dir;
+}
+
+/**
+ * O Slayer "guarda" o cursor quando ele fica parado por muito tempo (usuário lendo/ausente):
+ * vai até ele e fica por perto. dir: -1/0/1; guarding=false devolve ao comportamento normal.
+ */
+export function guardMove({ still, afterTicks = 600, selfX, pointerX, stop = 140 }) {
+    if (still < afterTicks) return { guarding: false, dir: 0 };
+    const d = pointerX - selfX;
+    if (Math.abs(d) <= stop) return { guarding: true, dir: 0 };
+    return { guarding: true, dir: Math.sign(d) };
+}

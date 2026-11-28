@@ -11,6 +11,9 @@ import { Imp }        from './characters/imp.js';
 import { Cacodemon }  from './characters/cacodemon.js';
 import { DoomSlayer } from './characters/doom-slayer.js';
 import { Projectile } from './projectile.js';
+import { Portal } from './portal.js';
+import { PointerTracker, PortalGate } from './behavior.js';
+import { NOTICE_RANGE, PORTAL_DEMON_TTL } from './utils.js';
 import { isWindowMaximized, UPDATE_INTERVAL_MS } from './utils.js';
 
 const SLAYER = 'DoomSlayer';   // sempre exatamente um em cena quando selecionado
@@ -29,6 +32,10 @@ export const GnomeletManager = GObject.registerClass(
             this._gnomelets = [];
             this._demonQueue = [];   // demônios mortos esperando para voltar
             this._projectiles = [];
+            this._portals = [];                       // anéis de fogo de entrada/saída
+            this._portalGate = new PortalGate();      // janela nova → às vezes sai um demônio
+            this._pointerTracker = new PointerTracker();
+            this._pendingTimeouts = new Set();
             this._settings = settings;
             this._windows = [];
             this._timerId = 0;
@@ -228,6 +235,13 @@ export const GnomeletManager = GObject.registerClass(
                     () => this._updateScale(), this);
             }
 
+            // Eventos de janela: abrir solta um demônio por um portal; abrir/fechar/minimizar
+            // faz quem está perto parar e olhar
+            global.display.connectObject('window-created', (_d, win) => this._onWindowCreated(win), this);
+            global.window_manager.connectObject(
+                'minimize', (_wm, actor) => this._onWindowGone(actor),
+                'destroy', (_wm, actor) => this._onWindowGone(actor), this);
+
             // Async load: Start loading state asynchronously.
             // The gnomelets will spawn in the callback.
             this._loadStateAsync();
@@ -268,6 +282,12 @@ export const GnomeletManager = GObject.registerClass(
             if (themeContext) {
                 themeContext.disconnectObject(this);
             }
+
+            global.display.disconnectObject(this);
+            global.window_manager.disconnectObject(this);
+            for (const id of this._pendingTimeouts) GLib.source_remove(id);
+            this._pendingTimeouts.clear();
+            this._destroyPortals();
 
             this._saveState();
             this._stopTimer();
@@ -471,6 +491,7 @@ export const GnomeletManager = GObject.registerClass(
             for (let p of this._gnomelets) p.destroy();
             this._gnomelets = [];
             this._destroyProjectiles();
+            this._destroyPortals();
             this._gnomelets = [];
         }
 
@@ -672,9 +693,13 @@ export const GnomeletManager = GObject.registerClass(
                 }
 
                 this._updateDemonQueue();
+                this._portalGate.tick();
+                this._updateEphemeral();
+                this._updatePortals();
                 const [pointerX, pointerY] = global.get_pointer();
+                const pointerStill = this._pointerTracker.update(pointerX, pointerY);
                 for (let p of this._gnomelets) {
-                p.observePointer(pointerX, pointerY);
+                p.observePointer(pointerX, pointerY, pointerStill);
                 p.update(this._windows, forceBackground, dockContainer, this._gnomelets, this._projectiles);
             }
             this._updateProjectiles();
@@ -682,7 +707,7 @@ export const GnomeletManager = GObject.registerClass(
             if (this._gnomelets.some(g => g._markedForRemoval)) {
                 this._gnomelets = this._gnomelets.filter(g => {
                     if (g._markedForRemoval) {
-                        if (DEMONS.includes(g._typeName)) this._queueDemon(g._typeName);
+                        if (DEMONS.includes(g._typeName) && !g._ephemeral) this._queueDemon(g._typeName);
                         g.destroy();
                         return false;
                     }
@@ -692,6 +717,90 @@ export const GnomeletManager = GObject.registerClass(
             } catch (e) {
                 console.error(e);
             }
+        }
+
+        // ---------- Eventos de janela e portais ----------
+
+        _onWindowCreated(win) {
+            if (this._isPaused || !win) return;
+            let type;
+            try { type = win.get_window_type(); } catch (e) { return; }
+            if (type !== Meta.WindowType.NORMAL) return;
+            // O retângulo da janela só é válido depois do primeiro frame
+            const id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
+                this._pendingTimeouts.delete(id);
+                try { this._onWindowReady(win); } catch (e) { console.error(e); }
+                return GLib.SOURCE_REMOVE;
+            });
+            this._pendingTimeouts.add(id);
+        }
+
+        /** Janela nova pronta: todos reparam; às vezes um demônio sai de um portal no topo dela. */
+        _onWindowReady(win) {
+            if (this._isPaused || !win.get_compositor_private()) return;
+            const rect = win.get_frame_rect();
+            if (rect.width < 160 || rect.height < 120) return;
+            this._noticeAround(rect.x + rect.width / 2, rect.y);
+            this._portalDemon(rect);
+        }
+
+        /** Solta um demônio (efêmero) no topo de `rect`, se o portão permitir. Devolve-o ou null. */
+        _portalDemon(rect) {
+            const active = this._gnomelets.filter(g => DEMONS.includes(g._typeName)).length + this._demonQueue.length;
+            const selected = this._settings.get_strv('gnomelet-type');
+            const type = this._portalGate.consider(active, n => Boolean(this._resources[n]) && selected.includes(n));
+            if (!type) return null;
+            const res = this._pickResource(type);
+            if (!res) return null;
+            const p = this._addCharacter(res);
+            p._ephemeral = true;                 // não renasce ao morrer nem ao sumir
+            p._portalTtl = PORTAL_DEMON_TTL;
+            const at = p.arriveAt(rect);
+            this._portals.push(new Portal(at.x, at.y));
+            return p;
+        }
+
+        /** Janela fechou ou minimizou: quem está perto para e olha para lá. */
+        _onWindowGone(actor) {
+            if (this._isPaused || !actor) return;
+            try {
+                const [x, y] = actor.get_position();
+                const [w, h] = actor.get_size();
+                this._noticeAround(x + w / 2, y + h / 2);
+            } catch (e) { /* ator já destruído */ }
+        }
+
+        _noticeAround(cx, cy) {
+            for (const g of this._gnomelets) {
+                if (!g.actor) continue;
+                const d = Math.hypot(g._x + g._displayW / 2 - cx, g._y + g._displayH / 2 - cy);
+                if (d < NOTICE_RANGE) g.notice(cx, cy);
+            }
+        }
+
+        /** Demônios de portal somem depois de um tempo (com um portal de saída). */
+        _updateEphemeral() {
+            for (const g of this._gnomelets) {
+                if (!(g._portalTtl > 0) || g._markedForRemoval) continue;
+                if (--g._portalTtl === 0) {
+                    this._portals.push(new Portal(g._x + g._displayW / 2, g._y + g._displayH / 2));
+                    g._markedForRemoval = true;
+                }
+            }
+        }
+
+        _updatePortals() {
+            if (this._portals.length === 0) return;
+            this._portals = this._portals.filter(p => {
+                p.update();
+                if (!p.alive) { p.destroy(); return false; }
+                return true;
+            });
+        }
+
+        _destroyPortals() {
+            for (const p of this._portals) p.destroy();
+            this._portals = [];
         }
 
         _updateInteractions() {
