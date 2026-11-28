@@ -42,6 +42,8 @@ export class Cacodemon extends Gnomelet {
         this._shootCooldownMax = 100; // ticks (~5s)
         this._shootDuration    = 0;
         this._shootDurationMax = 12;  // ticks que fica no estado SHOOTING
+        this._aggressive      = true;  // falso nas variações inofensivas (Lost Soul)
+        this._anchorFrac       = 0.25;  // altura de flutuação, como fração da altura do monitor
     }
 
     /**
@@ -129,7 +131,7 @@ export class Cacodemon extends Gnomelet {
 
         // Movimento vertical senoidal — ancorado no terço superior do monitor
         const monitor = platform.primaryMonitor();
-        const anchorY  = monitor.y + monitor.height * 0.25;
+        const anchorY  = monitor.y + monitor.height * this._anchorFrac;
         this._y = anchorY + Math.sin(this._floatTimer * FLOAT_FREQUENCY) * FLOAT_AMPLITUDE +
             (this._dropOffsetY || 0);
 
@@ -140,7 +142,7 @@ export class Cacodemon extends Gnomelet {
             const dy = slayer._y - this._y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            if (dist < this._detectRange && this._shootCooldown === 0) {
+            if (this._aggressive && dist < this._detectRange && this._shootCooldown === 0) {
                 this._state = State.SHOOTING;
                 this._shootDuration = this._shootDurationMax;
                 this._shootCooldown = this._shootCooldownMax;
@@ -160,7 +162,7 @@ export class Cacodemon extends Gnomelet {
         this._vx = 0;
         this._vy = 0;
         const monitor = platform.primaryMonitor();
-        const anchorY = monitor.y + monitor.height * 0.25;
+        const anchorY = monitor.y + monitor.height * this._anchorFrac;
         this._dropOffsetY = this._y - (anchorY + Math.sin(this._floatTimer * FLOAT_FREQUENCY) * FLOAT_AMPLITUDE);
     }
 
@@ -181,7 +183,7 @@ export class Cacodemon extends Gnomelet {
     arriveAt(rect) {
         const monitor = platform.primaryMonitor();
         this._x = rect.x + rect.width / 2 - this._displayW / 2;
-        this._y = monitor.y + monitor.height * 0.25;
+        this._y = monitor.y + monitor.height * this._anchorFrac;
         this._floatSpeedX = (Math.random() > 0.5 ? 1 : -1) * 1.5;
         this._velX = this._floatSpeedX;
         this._state = State.SPAWNING;

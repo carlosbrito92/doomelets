@@ -9,6 +9,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { Gnomelet } from './gnomelet.js';
 import { Imp }        from './characters/imp.js';
 import { Cacodemon }  from './characters/cacodemon.js';
+import { LostSoul }   from './characters/lost-soul.js';
 import { DoomSlayer } from './characters/doom-slayer.js';
 import { Projectile } from './projectile.js';
 import { Portal } from './portal.js';
@@ -858,6 +859,7 @@ export const GnomeletManager = GObject.registerClass(
                 case 'Imp':
                 case 'Imp2':       return new Imp(...args, cbFor('imp'));
                 case 'Cacodemon':  return new Cacodemon(...args, cbFor('caco'));
+                case 'LostSoul':   return new LostSoul(...args, cbFor('caco'));
                 case 'DoomSlayer':
                 case 'DoomEternal': return new DoomSlayer(...args, cbFor('slayer'));
                 default:           return new Gnomelet(...args);

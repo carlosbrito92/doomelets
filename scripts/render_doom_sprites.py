@@ -106,7 +106,7 @@ CHARS = {
     'LostSoul': dict(page='lostsoul-rig.html', yaw=45, pitch=8, anims={
         'walk': A(loop('walk', 8), 3),
         'run': A(loop('run', 8), 2),
-        'float': A(loop('idle', 8), 3),
+        'float': A(loop('walk', 8), 3),
         'idle': A(loop('idle', 8), 4),
         'jump': A(seq('jump', 0.0, 0.5, 1.0), 3, False),
         'fall': A(seq('fall', 0.0, 0.5, 1.0), 3, False),

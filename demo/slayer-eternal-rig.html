@@ -398,16 +398,13 @@ const ANIMS = {
   } },
   reload: { label: 'Recarregar', frames: 12, loop: true, fn: keyAnim([
     [0.00, P({ hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0 })],
-    [0.12, P({ spine: [4, 0, 0], head: [14, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 1, tilt: 1, pump: 0 })],
-    [0.22, P({ spine: [7, 0, 0], head: [18, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 2, tilt: 1, pump: 0 })],
-    [0.32, P({ spine: [4, 0, 0], head: [14, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 1, tilt: 1, pump: 0 })],
-    [0.42, P({ spine: [7, 0, 0], head: [18, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 2, tilt: 1, pump: 0 })],
-    [0.52, P({ spine: [4, 0, 0], head: [14, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 1, tilt: 1, pump: 0 })],
-    [0.62, P({ spine: [7, 0, 0], head: [18, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 2, tilt: 1, pump: 0 })],
-    [0.70, P({ spine: [4, 0, 0], head: [14, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 1, tilt: 1, pump: 0 })],
-    [0.78, P({ spine: [4, 0, 0], head: [4, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 0, tilt: 0.2, pump: 0 })],
-    [0.85, P({ spine: [4, 0, 0], head: [0, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 0, tilt: 0, pump: 1 })],
-    [0.92, P({ spine: [4, 0, 0], head: [0, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 0, tilt: 0, pump: 0 })],
+    [0.15, P({ spine: [2, -10, 0], head: [8, -26, 0], shR: [-110, 0, -16], elR: [-80, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0, tilt: 0.6 })],
+    [0.28, P({ spine: [3, -14, 0], head: [10, -34, 0], shR: [-150, 0, -10], elR: [-55, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0, tilt: 1 })],
+    [0.38, P({ spine: [3, -14, 0], head: [10, -34, 0], shR: [-132, 0, -10], elR: [-70, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0, tilt: 1 })],
+    [0.48, P({ spine: [3, -14, 0], head: [10, -34, 0], shR: [-152, 0, -10], elR: [-55, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0, tilt: 1 })],
+    [0.58, P({ spine: [3, -14, 0], head: [10, -34, 0], shR: [-132, 0, -10], elR: [-70, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0, tilt: 1 })],
+    [0.70, P({ spine: [3, -14, 0], head: [8, -30, 0], shR: [-150, 0, -10], elR: [-55, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0, tilt: 0.7 })],
+    [0.84, P({ spine: [2, -8, 0], head: [4, -14, 0], shR: [-90, 0, -14], elR: [-60, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.5, tilt: 0.2 })],
     [1.00, P({ hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0 })],
   ]) },
   look: { label: 'Olhar os lados', frames: 10, loop: true, fn: keyAnim([
@@ -520,6 +517,7 @@ function applyPose(p) {
   G.visible = false;
   const aim = p.aim || 0, rec = p.rec || 0;
   J.cannon.rotation.set(-0.35 + 0.3 * aim - 0.06 * rec, 0, 0);       // repouso: aponta para cima/trás; aim 1: para a frente
+  J.cannon.rotation.x -= 0.55 * (p.tilt || 0);                           // recarga: o canhão levanta
   J.cannon.position.z = -0.1 - 0.07 * rec;
   J.cannon.userData.flash.visible = (p.flash || 0) > 0.5;
   model.rotation.y = state.yaw * D2R;

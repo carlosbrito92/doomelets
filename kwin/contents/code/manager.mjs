@@ -13,6 +13,7 @@
 import { Gnomelet } from './gnomelet.mjs';
 import { Imp }        from './characters/imp.mjs';
 import { Cacodemon }  from './characters/cacodemon.mjs';
+import { LostSoul }   from './characters/lost-soul.mjs';
 import { DoomSlayer } from './characters/doom-slayer.mjs';
 import { Projectile } from './projectile.mjs';
 import { Portal } from './portal.mjs';
@@ -359,6 +360,7 @@ export class GnomeletManager {
             case 'Imp':
             case 'Imp2':       p = new Imp(...args, cbFor('imp')); break;
             case 'Cacodemon':  p = new Cacodemon(...args, cbFor('caco')); break;
+            case 'LostSoul':   p = new LostSoul(...args, cbFor('caco')); break;
             case 'DoomSlayer':
             case 'DoomEternal': p = new DoomSlayer(...args, cbFor('slayer')); break;
             default:           return new Gnomelet(...args);
