@@ -18,7 +18,7 @@ The desktop pet engine (physics, window and dock interaction, multi-monitor supp
 * **Sprite pipeline:** three.js rigs and a script that renders them to PNG frames.
 * **Its own extension identity:** UUID `doomelets@carlosbrito92.github.com` and settings schema `org.gnome.shell.extensions.doomelets`.
 
-The six characters inherited from Gnomelets (Kitten, Mouse, Puppy, Santa, Squirrel and Tux) were removed. Their role, harmless companions the Slayer can pet, will be taken by new built-in characters (Daisy, Pinky and Lost Soul), still to come. Until then the Slayer has nobody to pet unless you add your own character folder.
+The six characters inherited from Gnomelets (Kitten, Mouse, Puppy, Santa, Squirrel and Tux) were removed. Their role, harmless companions the Slayer can pet, is taken by three pixel-art characters: **Daisy** (a rabbit), **Pinky** (a pink demon pup) and **Lost Soul** (a floating flaming skull). They have no hit points, ignore the fighting and are drawn by `scripts/render_companion_sprites.py` (needs only Pillow).
 
 ## Doom characters
 
@@ -31,7 +31,7 @@ The six characters inherited from Gnomelets (Kitten, Mouse, Puppy, Santa, Squirr
 * When `DoomSlayer` is selected, there is **always exactly one** on screen. It counts toward the character count, and the remaining slots are filled with the other selected types.
 * If the Slayer dies, it respawns after about one second and is briefly invulnerable.
 * Dead Imps and Cacodemons come back from the screen edge after 5 to 10 seconds, as long as their type is still selected.
-* When no demon is in range, the Slayer pets non-Doom characters that pass nearby (custom ones, for now). Demons ignore them, and they cannot be damaged.
+* When no demon is in range, the Slayer pets non-Doom characters that pass nearby. Demons ignore them, and they cannot be damaged.
 * While standing still, the Slayer sometimes reloads the shotgun or looks around.
 
 ## Features inherited from Gnomelets
