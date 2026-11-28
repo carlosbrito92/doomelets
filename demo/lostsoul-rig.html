@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lost Soul · Pixel Rig</title>
+<style>
+  :root{--bg:#15110f;--panel:#1d1815;--rule:#4a3a30;--ink:#e8dcc4;--soft:#9a8c78;--hot:#d8571a;--green:#6fb04a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}
+  h1{margin:0;font:800 26px/1 Impact,'Arial Narrow',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--hot)}
+  header{padding:14px 18px;border-bottom:1px solid var(--rule)}
+  header p{margin:4px 0 0;color:var(--soft)}
+  main{display:grid;grid-template-columns:minmax(320px,1fr) 360px;gap:0;min-height:calc(100vh - 70px)}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  .stagecol{padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;border-right:1px solid var(--rule)}
+  #stage{border:1px solid var(--rule);cursor:grab;touch-action:none;
+    background:conic-gradient(#2a221d 25%,#241d19 0 50%,#2a221d 0 75%,#241d19 0) 0 0/16px 16px}
+  #stage:active{cursor:grabbing}
+  #view{display:block;width:100%;height:100%;image-rendering:pixelated}
+  .row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .ctrl{padding:14px 16px;overflow:auto;background:var(--panel)}
+  .sec{border-top:1px solid var(--rule);padding-top:10px;margin-top:14px}
+  .sec:first-child{border-top:0;margin-top:0;padding-top:0}
+  h2{margin:0 0 8px;font:600 11px/1 inherit;letter-spacing:.16em;text-transform:uppercase;color:var(--soft)}
+  button,select{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--rule);padding:7px 10px;cursor:pointer;border-radius:2px}
+  button:hover{border-color:var(--soft)}
+  button[aria-pressed=true]{background:var(--hot);border-color:var(--hot);color:#140c08}
+  button.main{background:var(--green);border-color:var(--green);color:#0d1a08}
+  .sl{display:grid;grid-template-columns:96px 1fr 44px;gap:8px;align-items:center;min-height:28px}
+  .sl output{text-align:right;color:var(--soft);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--hot)}
+  .tog{display:flex;gap:8px;align-items:center;min-height:28px;cursor:pointer}
+  .pal{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}
+  .pal li{display:flex;justify-content:space-between;align-items:center}
+  .sw{display:flex}.sw i{width:16px;height:14px;display:block}
+  #status{color:var(--soft);min-height:18px;margin:8px 0 0}
+  .fail{padding:30px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>Lost Soul · Pixel Rig</h1>
+  <p>Lost Soul: caveira flutuante de primitivas suaves (crânio, mandíbula articulada, órbitas com brasa e línguas de fogo animadas) em three.js, renderizada em baixa resolução com 3 tons + pontilhado + contorno.</p>
+</header>
+<main>
+  <section class="stagecol">
+    <div id="stage"><canvas id="view"></canvas></div>
+    <div class="row" id="views"></div>
+    <div class="row">
+      <button id="play" aria-pressed="true">⏸ Pausar</button>
+      <button id="prev">◀ Quadro</button>
+      <button id="next">Quadro ▶</button>
+    </div>
+    <div style="width:min(420px,100%)">
+      <div class="sl"><label for="frame">Quadro</label><input type="range" id="frame" min="0" max="7" step="1" value="0"><output id="frameo">1/8</output></div>
+      <div class="sl"><label for="speed">Velocidade</label><input type="range" id="speed" min="0.2" max="2" step="0.05" value="1"><output id="speedo">1×</output></div>
+    </div>
+    <p id="status"></p>
+  </section>
+
+  <section class="ctrl">
+    <div class="sec"><h2>Animações</h2><div class="row" id="anims" style="justify-content:flex-start"></div></div>
+
+    <div class="sec">
+      <h2>Articulação (edita e congela a pose)</h2>
+      <div class="row" id="joints" style="justify-content:flex-start"></div>
+      <div class="sl"><label for="jx">Frente ↔ trás</label><input type="range" id="jx" min="-180" max="180" value="0"><output id="jxo">0°</output></div>
+      <div class="sl"><label for="jy">Torção</label><input type="range" id="jy" min="-180" max="180" value="0"><output id="jyo">0°</output></div>
+      <div class="sl"><label for="jz">Lateral</label><input type="range" id="jz" min="-180" max="180" value="0"><output id="jzo">0°</output></div>
+    </div>
+
+    <div class="sec">
+      <h2>Câmera</h2>
+      <div class="sl"><label for="yaw">Giro</label><input type="range" id="yaw" min="0" max="359" value="45"><output id="yawo">45°</output></div>
+      <div class="sl"><label for="pitch">Inclinação</label><input type="range" id="pitch" min="-25" max="50" value="8"><output id="pitcho">8°</output></div>
+    </div>
+
+    <div class="sec">
+      <h2>Estilo</h2>
+      <label class="tog"><input type="checkbox" id="t-outline" checked>Contorno</label>
+      <label class="tog"><input type="checkbox" id="t-dither" checked>Pontilhado</label>
+      <div class="row" style="justify-content:flex-start;align-items:center;margin-top:6px">
+        <label for="res">Resolução</label>
+        <select id="res"><option value="64">64 × 64</option><option value="96" selected>96 × 96</option><option value="128">128 × 128</option></select>
+      </div>
+    </div>
+
+    <div class="sec"><h2>Paleta</h2><ul class="pal" id="pal"></ul></div>
+
+    <div class="sec">
+      <h2>Exportar</h2>
+      <div class="row" style="justify-content:flex-start;align-items:center;margin-bottom:8px">
+        <label for="scale">Escala</label>
+        <select id="scale"><option value="1">1×</option><option value="4" selected>4×</option><option value="8">8×</option></select>
+      </div>
+      <div class="row" style="flex-direction:column;align-items:stretch">
+        <button class="main" id="ex-frame">PNG do quadro atual</button>
+        <button id="ex-strip">Tira da animação (todos os quadros)</button>
+        <button id="ex-sheet">Folha de 8 ângulos (pose atual)</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+THREE.ColorManagement.enabled = false;
+
+const $ = id => document.getElementById(id);
+const D2R = Math.PI / 180;
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+
+/* ---------- paleta: 3 tons por peça (escuro → claro) ---------- */
+const PARTS = [
+  ['bone',   'Osso',       ['#5a3430', '#c49a74', '#f0d4a4']],
+  ['boneD',  'Rachaduras', ['#2c1410', '#6a3a2a', '#a8704c']],
+  ['socket', 'Órbitas',    ['#000000', '#0a0204', '#260a0c']],
+  ['ember',  'Brasa',      ['#c8300a', '#ff9020', '#fff08a']],
+  ['tooth',  'Dentes',     ['#8a6a4a', '#eadab8', '#fffaf0']],
+  ['mouth',  'Boca',       ['#100203', '#3a0a0a', '#701818']],
+  ['fireA',  'Fogo (borda)',  ['#5a0804', '#c81808', '#ff4a10']],
+  ['fireB',  'Fogo (meio)',   ['#a02a04', '#ff7a10', '#ffc030']],
+  ['fireC',  'Fogo (núcleo)', ['#ff8a10', '#ffd840', '#fffbd0']],
+  ['tan',    'Borda',      ['#4a3a2a', '#8a735a', '#c2a888']],
+  ['floor',  'Chão',       ['#1c1814', '#3a322a', '#5a5044']],
+  ['ledge',  'Plataforma', ['#2a2620', '#5a5448', '#8a8270']],
+];
+const PART_ID = {}; PARTS.forEach((p, i) => PART_ID[p[0]] = i + 1);
+const RAMP = [null, ...PARTS.map(p => p[2].map(hex))];
+const INK = hex('#0b0908');
+const T1 = 0.55, T2 = 0.80;
+const GLOW = {}; GLOW[PART_ID.ember] = 0.95; GLOW[PART_ID.fireA] = 0.6; GLOW[PART_ID.fireB] = 0.7; GLOW[PART_ID.fireC] = 0.92;
+const BAYER = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v => (v + .5) / 16 - .5);
+
+/* ---------- three.js ---------- */
+let W = 96, H = 96;
+const stage = $('stage'), view = $('view'), vctx = view.getContext('2d');
+let renderer, gl;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  gl = renderer.getContext();
+} catch (e) {
+  stage.innerHTML = '<div class="fail">WebGL indisponível neste navegador.</div>';
+  throw e;
+}
+
+const scene = new THREE.Scene();
+const FH = 2.3;
+const cam = new THREE.OrthographicCamera(-FH / 2, FH / 2, FH / 2, -FH / 2, 0.1, 20);
+const rig = new THREE.Group();
+rig.position.set(0, 0.95, 0);
+rig.add(cam); cam.position.set(0, 0, 6);
+scene.add(rig);
+scene.add(new THREE.AmbientLight(0xffffff, 0.3 * Math.PI));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8 * Math.PI);
+sun.position.set(-2.2, 3.2, 4);
+rig.add(sun); rig.add(sun.target);
+
+const litMat = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+const depthMat = new THREE.MeshDepthMaterial({ side: THREE.DoubleSide });
+const idMats = {};
+PARTS.forEach(p => { idMats[p[0]] = new THREE.MeshBasicMaterial({ color: new THREE.Color(PART_ID[p[0]] * 16 / 255, 0, 0), side: THREE.DoubleSide }); });
+
+const grp = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
+function mesh(geo, part, x, y, z, parent, sx = 1, sy = 1, sz = 1) {
+  const m = new THREE.Mesh(geo, idMats[part]);
+  m.position.set(x, y, z); m.scale.set(sx, sy, sz);
+  parent.add(m); return m;
+}
+const ball = (r, part, x, y, z, p, sx, sy, sz) => mesh(new THREE.SphereGeometry(r, 14, 11), part, x, y, z, p, sx, sy, sz);
+function limb(rTop, rBot, len, part, parent, y = 0, sz = 1) {
+  const g = new THREE.CylinderGeometry(rTop, rBot, len, 14, 1);
+  g.translate(0, -len / 2, 0);
+  return mesh(g, part, 0, y, 0, parent, 1, 1, sz);
+}
+function trunk(rTop, rBot, h, part, parent, x, y, z, sz = 1) {
+  const g = new THREE.CylinderGeometry(rTop, rBot, h, 18, 1);
+  return mesh(g, part, x, y, z, parent, 1, 1, sz);
+}
+function tube(r, len, part, parent, x, y, z) {   // cilindro ao longo de +z
+  const g = new THREE.CylinderGeometry(r, r, len, 10, 1);
+  g.rotateX(Math.PI / 2);
+  return mesh(g, part, x, y, z, parent);
+}
+
+const model = new THREE.Group(); scene.add(model);
+const J = {};
+const allMeshes = [];
+const ARM_U = 0.3, ARM_F = 0.3;      // (não usado; mantém solveArm herdado)
+const UPV = new THREE.Vector3(0, 1, 0);
+function spike(parent, dir, base, len, rad, part = 'horn') {
+  const d = new THREE.Vector3(...dir).normalize();
+  const g = new THREE.ConeGeometry(rad, len, 8); g.translate(0, len / 2, 0);
+  const m = mesh(g, part, d.x * base, d.y * base, d.z * base, parent);
+  m.quaternion.setFromUnitVectors(UPV, d); return m;
+}
+const R = 0.4;
+J.root = grp(model, 0, 1.0, 0);
+J.jaw = grp(J.root, 0, -0.2, -0.02);          // dobradiça atrás e embaixo: ângulo positivo abre a boca
+J.lid = grp(J.root, 0, 0.1, 0.3);             // sobrancelhas
+J.eye = grp(J.root, 0, 0.02, 0);              // brasas dos olhos
+J.flame = grp(J.root, 0, 0.04, -0.08);
+
+/* crânio: calota redonda, face ESTREITA embaixo (é o que faz parecer caveira), maçãs do rosto salientes */
+ball(R, 'bone', 0, 0.08, -0.04, J.root, 1.0, 0.95, 1.05);
+ball(0.2, 'bone', 0, -0.15, 0.3, J.root, 0.8, 0.95, 1.0);
+for (const s of [-1, 1]) {
+  ball(0.09, 'bone', s * 0.26, -0.09, 0.2, J.root, 0.9, 0.8, 1.3);                               // maçã do rosto
+  ball(0.075, 'boneD', s * 0.2, -0.19, 0.3, J.root, 1.0, 0.9, 0.4);                              // bochecha oca
+  ball(0.13, 'bone', s * 0.14, 0.01, 0.05, J.lid, 1.35, 0.5, 0.9);                               // arco da sobrancelha
+}
+/* rachaduras no osso (pontos de Fibonacci na calota) */
+for (let i = 0; i < 40; i++) {
+  const y = 1 - 2 * (i + 0.5) / 40, rr = Math.sqrt(1 - y * y), th = i * 2.399963;
+  const d = new THREE.Vector3(Math.cos(th) * rr, y, Math.sin(th) * rr);
+  if (d.y < 0.0 || (d.z > 0.2 && d.y < 0.6)) continue;                                           // rosto livre
+  const h = Math.abs(Math.sin(i * 91.7));
+  const m = ball(0.035 + 0.035 * h, 'boneD', d.x * R * 0.99, 0.08 + d.y * R * 0.93, -0.04 + d.z * R * 1.03, J.root, 1.8, 0.8, 0.3);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d);
+}
+/* órbitas GRANDES e escuras com uma brasa pequena no fundo; cavidade do nariz em V invertido */
+for (const s of [-1, 1]) {
+  ball(0.135, 'socket', s * 0.15, 0.0, 0.34, J.root, 1.0, 1.05, 0.55);
+  ball(0.042, 'ember', s * 0.15, -0.01, 0.4, J.eye, 1.0, 1.2, 0.5);
+}
+ball(0.06, 'socket', 0, -0.15, 0.49, J.root, 0.8, 1.5, 0.4);
+/* boca: cavidade escura, fileira de cima no crânio, fileira de baixo + mandíbula estreita */
+ball(0.14, 'mouth', 0, -0.21, 0.26, J.root, 1.0, 0.3, 1.25);
+for (let k = -3; k <= 3; k++) {
+  const x = k * 0.05, z = 0.37 - Math.abs(k) * 0.04;
+  mesh(new THREE.BoxGeometry(0.04, 0.075 - Math.abs(k) * 0.006, 0.04), 'tooth', x, -0.255, z, J.root);
+}
+ball(0.17, 'bone', 0, -0.07, 0.24, J.jaw, 0.85, 0.5, 1.15);
+ball(0.08, 'bone', 0, -0.1, 0.4, J.jaw, 0.9, 0.75, 0.8);                                         // queixo
+for (let k = -3; k <= 3; k++) {
+  const x = k * 0.047, z = 0.36 - Math.abs(k) * 0.04;
+  mesh(new THREE.BoxGeometry(0.036, 0.06, 0.034), 'tooth', x, -0.035, z, J.jaw);
+}
+
+/* fogo só ATRÁS e em cima do crânio (nunca na frente do rosto): cada língua é uma corrente de bolhas,
+   quente (amarelo) perto da cabeça e vermelha na ponta; flames() faz a corrente serpentear */
+const BLOBS = [['fireC', 0.11], ['fireB', 0.105], ['fireB', 0.09], ['fireA', 0.07], ['fireA', 0.045]];
+const TONGUES = [];
+[
+  // pos (no grupo da chama), direção, tamanho, ciclos por volta, fase — direções bem separadas (>35°) para não fundir
+  [[0.0, 0.28, -0.22],   [0, 1, -0.3],         1.00, 1, 0.00],
+  [[0.2, 0.18, -0.2],    [0.8, 0.6, -0.45],    0.90, 2, 0.31],
+  [[-0.2, 0.18, -0.2],   [-0.8, 0.6, -0.45],   0.90, 2, 0.64],
+  [[0.12, -0.02, -0.3],  [0.35, 0.05, -1],     0.85, 1, 0.18],
+  [[-0.12, -0.02, -0.3], [-0.5, -0.2, -1],     0.75, 1, 0.47],
+  [[0.0, -0.2, -0.25],   [0, -0.7, -0.75],     0.70, 2, 0.88],
+].forEach(([p, d, s, k, o]) => {
+  const g = grp(J.flame, p[0], p[1], p[2]);
+  const blobs = BLOBS.map(([part, r], i) => ball(r, part, 0, 0.02 + i * 0.1, 0, g, 1, 1.4, 1));
+  TONGUES.push({ g, blobs, d: new THREE.Vector3(...d).normalize(), s, k, o });
+});
+
+const fireball = ball(0.2, 'fireC', 0, -0.2, 0.45, J.root, 1, 1, 1);
+fireball.visible = false;
+
+model.traverse(o => { if (o.isMesh) allMeshes.push(o); });
+
+/* cenário das animações de pulo: chão + degrau (fora do rig, não entra no cálculo de apoio dos pés) */
+const props = new THREE.Group(); scene.add(props); props.visible = false;
+const floorM = mesh(new THREE.BoxGeometry(3.2, 0.1, 3.2), 'floor', 0, -0.05, 0, props);
+const LEDGE_H = 0.7, LEDGE_EDGE = 0.2;
+const ledgeM = mesh(new THREE.BoxGeometry(1.2, LEDGE_H, 1.6), 'ledge', 0, LEDGE_H / 2, 0, props);
+mesh(new THREE.BoxGeometry(1.24, 0.06, 1.64), 'tan', 0, LEDGE_H / 2 - 0.03, 0, ledgeM);
+
+/* ---------- IK de 2 ossos: leva o pulso até um ponto no espaço do tronco ---------- */
+const DOWN = new THREE.Vector3(0, -1, 0);
+const _t = new THREE.Vector3(), _p = new THREE.Vector3(), _e = new THREE.Vector3(), _dU = new THREE.Vector3(), _dF = new THREE.Vector3();
+const _q = new THREE.Quaternion();
+function solveArm(tag, side, T) {
+  const sh = J['sh' + tag], el = J['el' + tag], a = ARM_U, b = ARM_F;
+  const dv = _t.copy(T).sub(sh.position);
+  const d = Math.min(Math.max(dv.length(), 0.08), (a + b) * 0.995);
+  const u = dv.normalize();
+  const along = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - along * along));
+  _p.set(side * 0.7, -1, -0.25);
+  _p.addScaledVector(u, -_p.dot(u)).normalize();
+  _e.copy(sh.position).addScaledVector(u, along).addScaledVector(_p, h);
+  _dU.copy(_e).sub(sh.position).normalize();
+  _dF.copy(sh.position).addScaledVector(u, d).sub(_e).normalize();
+  sh.quaternion.setFromUnitVectors(DOWN, _dU);
+  _q.copy(sh.quaternion).invert();
+  _dF.applyQuaternion(_q);
+  el.quaternion.setFromUnitVectors(DOWN, _dF);
+}
+
+/* ---------- animações ---------- */
+const JOINTS = [
+  ['root', 'Corpo', 'YXZ'], ['jaw', 'Mandíbula', 'YXZ'], ['eye', 'Olho', 'YXZ'], ['lid', 'Pálpebra', 'YXZ'],
+];
+JOINTS.forEach(j => J[j[0]].rotation.order = j[2]);
+
+const sm = x => x * x * (3 - 2 * x);
+const clamp01 = x => Math.max(0, Math.min(1, x));
+const mx = Math.max;
+
+/* pose = { j:{nome:[x,y,z]}, gun:bool, aim, rec, pump, flash } */
+function lerpPose(a, b, f) {
+  const out = { j: {} };
+  const names = new Set([...Object.keys(a.j || {}), ...Object.keys(b.j || {})]);
+  names.forEach(n => {
+    const p = (a.j && a.j[n]) || [0, 0, 0], q = (b.j && b.j[n]) || [0, 0, 0];
+    out.j[n] = [0, 1, 2].map(i => p[i] + (q[i] - p[i]) * f);
+  });
+  out.prop = a.prop;
+  ['fire', 'lift', 'dz', 'sq'].forEach(k => out[k] = (a[k] || 0) + ((b[k] || 0) - (a[k] || 0)) * f);
+  return out;
+}
+function keyAnim(list) {
+  return t => {
+    let i = 0;
+    while (i < list.length - 2 && t >= list[i + 1][0]) i++;
+    const [t0, p0] = list[i], [t1, p1] = list[i + 1];
+    const f = sm(clamp01((t - t0) / (t1 - t0 || 1)));
+    return lerpPose(p0, p1, f);
+  };
+}
+/* Cacodemon flutua: nada de chão; `lift` = altura, `sq` = achatar/esticar, `dz` = avançar */
+const TAU = Math.PI * 2, S = Math.sin, C = Math.cos;
+const P = (j, e) => Object.assign({ j }, e);
+/* Pose = { j: ângulos por articulação, lift (altura), sq (achatar), fire (bola de fogo),
+   ph (fase 0..1 do tremular do fogo), fl (comprimento do fogo), fd (puxa o fogo: negativo = para baixo) } */
+const ANIMS = {
+  idle: { label: 'Flutuar', frames: 8, loop: true, fn: t => { const a = t * TAU;
+    return P({ root: [3 * S(a), 0, 2 * C(a)], jaw: [6 + 4 * S(a + 1), 0, 0] }, { lift: 0.05 * S(a), sq: 0.02 * S(2 * a), ph: t }); } },
+  walk: { label: 'Deslizar', frames: 8, loop: true, fn: t => { const a = t * TAU;
+    return P({ root: [8 + 3 * S(2 * a), 0, 5 * S(a)], jaw: [10 + 8 * S(2 * a), 0, 0] }, { lift: 0.06 * S(a), ph: t, fl: 1.15, fd: -0.15 }); } },
+  run: { label: 'Investida', frames: 8, loop: true, fn: t => { const a = t * TAU;
+    return P({ root: [22, 0, 3 * S(a)], jaw: [30 + 14 * S(2 * a), 0, 0], lid: [10, 0, 0] }, { lift: 0.03 * S(2 * a), sq: -0.06, ph: t, fl: 1.7, fd: -0.3 }); } },
+  jump: { label: 'Subir', frames: 6, loop: false, fn: t => P(
+    { root: [-16 + 6 * t, 0, 0], jaw: [34 - 24 * t, 0, 0] }, { lift: 0.3 * sm(t), sq: -0.08 * (1 - t), ph: t, fl: 1.3, fd: -0.9 }) },
+  fall: { label: 'Cair', frames: 6, loop: false, fn: t => P(
+    { root: [14 + 6 * t, 0, 0], jaw: [16, 0, 0] }, { lift: -0.12 * sm(t), sq: -0.05, ph: t, fl: 1.2, fd: 0.8 }) },
+  held: { label: 'Pego (drag)', frames: 4, loop: true, fn: t => { const a = t * TAU;
+    return P({ root: [10, 0, 14 * S(a)], jaw: [30 + 16 * S(2 * a), 0, 0], lid: [14, 0, 0] }, { lift: 0.04 * C(a), ph: t, fl: 1.3, fd: 0.5 }); } },
+  chomp: { label: 'Mastigar', frames: 8, loop: true, fn: t => { const a = t * TAU, o = 0.5 - 0.5 * C(2 * a);
+    return P({ root: [-8 * o, 0, 0], jaw: [4 + 50 * o * o, 0, 0], lid: [-6 * o, 0, 0] }, { lift: 0.03 * S(a), sq: 0.06 * (1 - o), ph: t, fl: 1.2 }); } },
+};
+
+/* fogo: orienta e estica cada língua conforme a fase; ciclos inteiros por volta mantêm o loop contínuo */
+const _fd = new THREE.Vector3();
+function flames(p) {
+  const ph = p.ph || 0, fl = p.fl == null ? 1 : p.fl, fd = p.fd || 0;
+  for (const f of TONGUES) {
+    const w = TAU * (ph * f.k + f.o);
+    _fd.set(f.d.x + 0.22 * S(w), f.d.y + fd + 0.2 * C(w + 1.3), f.d.z).normalize();
+    f.g.quaternion.setFromUnitVectors(UPV, _fd);
+    f.g.scale.set(1, f.s * fl * (0.75 + 0.4 * S(w + 2.0)), 1);
+    f.blobs.forEach((b, i) => {                       // cada bolha com fase própria: a língua ondula da base à ponta
+      b.position.x = 0.04 * i * S(w - i * 1.1);
+      b.position.z = 0.03 * i * C(w - i * 0.9);
+      const sc = 1 + 0.18 * S(2 * w + i);
+      b.scale.set(sc, 1.4 * (1 + 0.12 * C(2 * w + i)), sc);
+    });
+  }
+  J.eye.scale.setScalar(1 + 0.12 * S(TAU * ph * 2));
+}
+const _applyPose = applyPose;
+applyPose = p => { _applyPose(p); flames(p); };
+
+
+const ANIM_KEYS = Object.keys(ANIMS);
+
+/* ---------- estado ---------- */
+const state = { anim: 'idle', t: 0, frame: 0, playing: true, speed: 1, yaw: 45, pitch: 8, outline: true, dither: true,
+                sel: 'root', manual: null };
+
+function poseAt(anim, frame) {
+  const A = ANIMS[anim];
+  const t = A.loop ? frame / A.frames : frame / (A.frames - 1);
+  return A.fn(Math.min(t, 1));
+}
+function currentPose() {
+  if (state.manual) return state.manual;
+  const A = ANIMS[state.anim];
+  const t = A.loop ? state.t : Math.min(state.t, 1);
+  return A.fn(t);
+}
+
+const _v = new THREE.Vector3(), _w = new THREE.Vector3();
+function groundFeet(lift = 0) {
+  J.root.position.y = 1.0;
+  model.updateMatrixWorld(true);
+  let minY = Infinity;
+  for (const m of allMeshes) {
+    if (!m.visible) continue;
+    const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i += 2) {
+      _w.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      if (_w.y < minY) minY = _w.y;
+    }
+  }
+  J.root.position.y = 1.0 - minY + lift;
+  model.updateMatrixWorld(true);
+}
+
+function applyPose(p) {
+  JOINTS.forEach(([n]) => {
+    const a = (p.j && p.j[n]) || [0, 0, 0];
+    J[n].rotation.set(a[0] * D2R, a[1] * D2R, a[2] * D2R);
+  });
+  fireball.visible = (p.fire || 0) > 0.05;
+  fireball.scale.setScalar(Math.max(0.01, p.fire || 0));
+  model.rotation.y = state.yaw * D2R;
+  rig.rotation.x = -state.pitch * D2R;
+  J.root.position.y = 1.0 + (p.lift || 0);
+  const sq = p.sq || 0;
+  J.root.scale.set(1 + 0.5 * sq, 1 - sq, 1 + 0.5 * sq);
+  const dz = p.dz || 0;
+  model.position.set(Math.sin(state.yaw * D2R) * dz, 0, Math.cos(state.yaw * D2R) * dz);
+  props.rotation.y = state.yaw * D2R;
+  const fol = p.prop ? 1 : 0;
+  rig.position.set(Math.sin(state.yaw * D2R) * dz * 0.9 * fol, 1.0 + (p.lift || 0) * fol, Math.cos(state.yaw * D2R) * dz * 0.9 * fol);
+  props.visible = !!p.prop;
+  if (p.prop) {
+    ledgeM.position.z = p.prop === 'up' ? LEDGE_EDGE + 0.8 : LEDGE_EDGE - 0.8;
+    model.updateMatrixWorld(true);
+  }
+  model.updateMatrixWorld(true);
+}
+
+/* ---------- renderização pixel ---------- */
+function fitDepthRange() {
+  rig.updateMatrixWorld(true);
+  const r = 1.4;      // esfera de segurança em volta do rig
+  cam.near = 6 - r; cam.far = 6 + r;
+  cam.updateProjectionMatrix();
+}
+function pass(kind, w, h) {
+  renderer.setSize(w, h, false);
+  renderer.setClearColor(0x000000, 1);
+  scene.overrideMaterial = kind === 'lit' ? litMat : kind === 'depth' ? depthMat : null;
+  renderer.render(scene, cam);
+  scene.overrideMaterial = null;
+  const buf = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+  return buf;
+}
+const FLASH_ID = PART_ID.flash;
+function composePixel(w, h, o) {
+  fitDepthRange();
+  const lit = pass('lit', w, h), idb = pass('id', w, h), dep = pass('depth', w, h);
+  const n = w * h, ids = new Uint8Array(n), dp = new Uint8Array(n), L = new Float32Array(n);
+  for (let y = 0; y < h; y++) {
+    const row = (h - 1 - y) * w;
+    for (let x = 0; x < w; x++) {
+      const i = (row + x) * 4, k = y * w + x;
+      ids[k] = Math.round(idb[i] / 16); dp[k] = dep[i]; L[k] = lit[i] / 255;
+    }
+  }
+  const img = new ImageData(w, h), d = img.data;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const k = y * w + x, id = ids[k], q = k * 4;
+    let c = null;
+    if (id && RAMP[id]) {
+      let l = L[k]; if (GLOW[id]) l = GLOW[id] + (l - 0.5) * 0.5;
+      if (o.dither) l += BAYER[(y & 3) * 4 + (x & 3)] * 0.12;
+      c = RAMP[id][l < T1 ? 0 : l < T2 ? 1 : 2];
+    }
+    if (o.outline) {
+      const nb = [x > 0 ? k - 1 : -1, x < w - 1 ? k + 1 : -1, y > 0 ? k - w : -1, y < h - 1 ? k + w : -1];
+      let edge = false;
+      for (const m of nb) {
+        if (m < 0 || ids[m] === id) continue;
+        if (!id) { edge = true; break; }
+        if (ids[m] && dp[k] + 3 < dp[m]) { edge = true; break; }
+      }
+      if (edge) c = INK;
+    }
+    if (c) { d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = 255; }
+  }
+  return img;
+}
+function renderPose(p, w, h) {
+  applyPose(p);
+  return composePixel(w, h, state);
+}
+
+/* ---------- loop de tela ---------- */
+function draw() {
+  const p = currentPose();
+  const img = renderPose(p, W, H);
+  view.width = W; view.height = H;
+  vctx.putImageData(img, 0, 0);
+  syncJointSliders();
+}
+function layoutStage() {
+  const room = Math.min(window.innerWidth - 40, window.innerHeight - 300, 640);
+  const s = Math.max(1, Math.floor(room / W));
+  stage.style.width = W * s + 'px'; stage.style.height = H * s + 'px';
+}
+let last = performance.now(), dirty = true;
+function tick(now) {
+  const dt = (now - last) / 1000; last = now;
+  const A = ANIMS[state.anim];
+  if (state.playing && !state.manual) {
+    const dur = A.frames / 10 / state.speed;     // 10 quadros por segundo
+    state.t += dt / dur;
+    if (A.loop) state.t %= 1; else if (state.t > 1) state.t = 0 ;
+    const f = Math.floor(state.t * (A.loop ? A.frames : A.frames - 1) + 0.0001);
+    if (f !== state.frame) { state.frame = f; syncFrameUI(); }
+    dirty = true;
+  }
+  if (dirty) { dirty = false; draw(); }
+  requestAnimationFrame(tick);
+}
+const queue = () => { dirty = true; };
+
+/* ---------- UI ---------- */
+function setAnim(k) {
+  state.anim = k; state.t = 0; state.frame = 0; state.manual = null;
+  if (ANIMS[k].yaw != null) setYaw(ANIMS[k].yaw);
+  const A = ANIMS[k];
+  $('frame').max = A.frames - 1;
+  document.querySelectorAll('#anims button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k));
+  syncFrameUI(); queue();
+}
+function syncFrameUI() {
+  const A = ANIMS[state.anim];
+  $('frame').value = state.frame; $('frameo').textContent = (state.frame + 1) + '/' + A.frames;
+}
+function setFrame(f) {
+  const A = ANIMS[state.anim];
+  state.frame = (f + A.frames) % A.frames;
+  state.t = A.loop ? state.frame / A.frames : state.frame / (A.frames - 1);
+  state.manual = null; state.playing = false; $('play').setAttribute('aria-pressed', false); $('play').textContent = '▶ Tocar';
+  syncFrameUI(); queue();
+}
+ANIM_KEYS.forEach(k => {
+  const b = document.createElement('button'); b.textContent = ANIMS[k].label; b.dataset.k = k;
+  b.setAttribute('aria-pressed', false); b.onclick = () => setAnim(k); $('anims').appendChild(b);
+});
+$('play').onclick = () => {
+  state.playing = !state.playing; state.manual = state.playing ? null : state.manual;
+  $('play').setAttribute('aria-pressed', state.playing); $('play').textContent = state.playing ? '⏸ Pausar' : '▶ Tocar';
+};
+$('prev').onclick = () => setFrame(state.frame - 1);
+$('next').onclick = () => setFrame(state.frame + 1);
+$('frame').oninput = e => setFrame(+e.target.value);
+$('speed').oninput = e => { state.speed = +e.target.value; $('speedo').textContent = state.speed + '×'; };
+
+[['Perfil →', 90], ['3/4 frente', 35], ['Frente', 0], ['Costas', 180], ['Perfil ←', 270]].forEach(([l, y]) => {
+  const b = document.createElement('button'); b.textContent = l;
+  b.onclick = () => { setYaw(y); }; $('views').appendChild(b);
+});
+function setYaw(y) { state.yaw = ((y % 360) + 360) % 360; $('yaw').value = Math.round(state.yaw); $('yawo').textContent = Math.round(state.yaw) + '°'; queue(); }
+$('yaw').oninput = e => setYaw(+e.target.value);
+$('pitch').oninput = e => { state.pitch = +e.target.value; $('pitcho').textContent = state.pitch + '°'; queue(); };
+$('t-outline').onchange = e => { state.outline = e.target.checked; queue(); };
+$('t-dither').onchange = e => { state.dither = e.target.checked; queue(); };
+$('res').onchange = e => { W = H = +e.target.value; layoutStage(); queue(); };
+window.addEventListener('resize', () => { layoutStage(); queue(); });
+
+/* articulações: ler os ângulos atuais; editar congela a pose em modo FK */
+JOINTS.forEach(([k, label]) => {
+  const b = document.createElement('button'); b.textContent = label; b.dataset.k = k;
+  b.setAttribute('aria-pressed', k === state.sel);
+  b.onclick = () => { state.sel = k; document.querySelectorAll('#joints button').forEach(c => c.setAttribute('aria-pressed', c.dataset.k === k)); syncJointSliders(); };
+  $('joints').appendChild(b);
+});
+let editing = false;
+function syncJointSliders() {
+  if (editing) return;
+  const r = J[state.sel].rotation;
+  ['x', 'y', 'z'].forEach(ax => { const v = Math.round(r[ax] / D2R); $('j' + ax).value = v; $('j' + ax + 'o').textContent = v + '°'; });
+}
+['x', 'y', 'z'].forEach((ax, i) => {
+  $('j' + ax).oninput = e => {
+    if (!state.manual) {              // congela a pose atual (inclusive braços resolvidos por IK) em FK
+      const cur = currentPose(), j = {};
+      JOINTS.forEach(([n]) => { const r = J[n].rotation; j[n] = [r.x / D2R, r.y / D2R, r.z / D2R]; });
+      state.manual = Object.assign({}, cur, { j, fk: true });
+      state.playing = false; $('play').setAttribute('aria-pressed', false); $('play').textContent = '▶ Tocar';
+    }
+    const a = state.manual.j[state.sel].slice(); a[i] = +e.target.value; state.manual.j[state.sel] = a;
+    $('j' + ax + 'o').textContent = a[i] + '°';
+    editing = true; draw(); editing = false;
+  };
+});
+
+/* arrastar o palco gira o boneco */
+let drag = null;
+stage.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, yaw: state.yaw, pitch: state.pitch }; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove', e => {
+  if (!drag) return;
+  setYaw(drag.yaw + (e.clientX - drag.x) * 0.9);
+  state.pitch = Math.max(-25, Math.min(50, drag.pitch + (e.clientY - drag.y) * 0.4));
+  $('pitch').value = Math.round(state.pitch); $('pitcho').textContent = Math.round(state.pitch) + '°';
+});
+stage.addEventListener('pointerup', () => drag = null);
+stage.addEventListener('pointercancel', () => drag = null);
+
+PARTS.forEach(p => {
+  const li = document.createElement('li'), n = document.createElement('span'), sw = document.createElement('span');
+  n.textContent = p[1]; sw.className = 'sw';
+  p[2].forEach(c => { const i = document.createElement('i'); i.style.background = c; sw.appendChild(i); });
+  li.append(n, sw); $('pal').appendChild(li);
+});
+
+/* ---------- exportação ---------- */
+const say = t => $('status').textContent = t;
+function toCanvas(img) { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').putImageData(img, 0, 0); return c; }
+function scaled(src, s) {
+  if (s === 1) return src;
+  const o = document.createElement('canvas'); o.width = src.width * s; o.height = src.height * s;
+  const g = o.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(src, 0, 0, o.width, o.height); return o;
+}
+function save(canvas, name) {
+  canvas.toBlob(b => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    say(name + ' · ' + canvas.width + '×' + canvas.height);
+  }, 'image/png');
+}
+const exScale = () => +$('scale').value;
+$('ex-frame').onclick = () => save(scaled(toCanvas(renderPose(currentPose(), W, H)), exScale()), `caco-${state.anim}-${state.frame}.png`);
+$('ex-strip').onclick = () => {
+  const A = ANIMS[state.anim], c = document.createElement('canvas'); c.width = W * A.frames; c.height = H;
+  const g = c.getContext('2d');
+  for (let i = 0; i < A.frames; i++) g.putImageData(renderPose(poseAt(state.anim, i), W, H), i * W, 0);
+  save(scaled(c, exScale()), `caco-${state.anim}-strip${A.frames}.png`);
+};
+$('ex-sheet').onclick = () => {
+  const keep = state.yaw, c = document.createElement('canvas'); c.width = W * 8; c.height = H;
+  const g = c.getContext('2d'), p = currentPose();
+  for (let i = 0; i < 8; i++) { state.yaw = i * 45; g.putImageData(renderPose(p, W, H), i * W, 0); }
+  state.yaw = keep; queue();
+  save(scaled(c, exScale()), `caco-${state.anim}-8dir.png`);
+};
+
+/* usado por scripts/render_doom_sprites.py: renderiza um quadro com fundo transparente, sem cenário nem deslocamento */
+function renderAt(anim, t, yaw, pitch, res) {
+  state.yaw = yaw; state.pitch = pitch; W = H = res;
+  const pose = ANIMS[anim].fn(t);
+  if (pose.prop) pose.lift = 0;
+  pose.prop = null; pose.dz = 0;
+  return toCanvas(renderPose(pose, W, H)).toDataURL('image/png');
+}
+window.__rig = { renderAt, state, setAnim, setFrame, setYaw, queue, THREE, J, draw };
+layoutStage(); setAnim('idle'); requestAnimationFrame(tick);
+</script>
+</body>
+</html>
