@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Renderiza os sprites do Doom Slayer, Imp e Cacodemon a partir dos rigs three.js em demo/.
+"""Renderiza os sprites do Doom Slayer, Imp, Cacodemon, Lost Soul e Pinky a partir dos rigs three.js em demo/.
 
 Requer: pip install playwright pillow && playwright install chromium
 Uso:    python3 scripts/render_doom_sprites.py [pasta_de_saida]   (padrão: src/images)
@@ -73,6 +73,24 @@ CHARS = {
         'attack': A(seq('fireball', 0.10, 0.22, 0.36, 0.52, 0.68, 0.76, 0.87, 0.96), 1.5, False),
         'hurt': A(HURT, 2, False),
         'death': A(DEATH, 3, False),
+        'held': A(loop('held', 4), 4),
+    }),
+    'LostSoul': dict(page='lostsoul-rig.html', yaw=45, pitch=8, anims={
+        'walk': A(loop('walk', 8), 3),
+        'run': A(loop('run', 8), 2),
+        'float': A(loop('idle', 8), 3),
+        'idle': A(loop('idle', 8), 4),
+        'jump': A(seq('jump', 0.0, 0.5, 1.0), 3, False),
+        'fall': A(seq('fall', 0.0, 0.5, 1.0), 3, False),
+        'held': A(loop('held', 4), 4),
+    }),
+    'Pinky': dict(page='pinky-rig.html', yaw=60, pitch=8, anims={
+        'walk': A(loop('walk', 8), 3),
+        'run': A(loop('run', 8), 2),
+        'idle': A(loop('idle', 8), 4),
+        'jump': A(seq('jump', 0.0, 0.5, 1.0), 3, False),
+        'fall': A(seq('fall', 0.0, 0.5, 1.0), 3, False),
+        'attack': A(seq('bite', 0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.0), 2, False),
         'held': A(loop('held', 4), 4),
     }),
 }

@@ -165,7 +165,7 @@ def loop(n):
 # animação -> (quadros t, ticks de 50 ms por quadro, loop). 'held' toca ao arrastar.
 ANIMS = {'walk': (loop(8), 2, True), 'run': (loop(8), 1.5, True), 'idle': (loop(6), 5, True),
          'jump': ([0.0, 0.34, 0.67], 3, False), 'fall': ([0.0, 0.34, 0.67], 3, False), 'held': (loop(4), 4, True)}
-CHARS = {'Daisy': daisy, 'Pinky': pinky, 'LostSoul': lostsoul}
+CHARS = {'Daisy': daisy}   # Lost Soul e Pinky vêm dos rigs 3D (render_doom_sprites.py)
 # Mesmos quadros em walk e run no Lost Soul: ele flutua, só muda o ritmo.
 
 
