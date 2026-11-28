@@ -20,7 +20,7 @@ import { PointerTracker, PortalGate } from './behavior.mjs';
 import { NOTICE_RANGE, PORTAL_DEMON_TTL, DEFAULT_TYPES } from './utils.mjs';
 
 const SLAYER = 'DoomSlayer';   // sempre exatamente um em cena quando selecionado
-const DEMONS = ['Imp', 'Cacodemon'];
+const DEMONS = ['Imp', 'Imp2', 'Cacodemon'];   // Imp2: variação visual do Imp (mesma classe e IA)
 
 export class GnomeletManager {
     constructor(settings, host) {
@@ -350,7 +350,8 @@ export class GnomeletManager {
         const cbFor = (owner) => (x, y, vx, vy, dmg) => this._spawnProjectile(x, y, vx, vy, owner, dmg);
         let p;
         switch (type) {
-            case 'Imp':        p = new Imp(...args, cbFor('imp')); break;
+            case 'Imp':
+            case 'Imp2':       p = new Imp(...args, cbFor('imp')); break;
             case 'Cacodemon':  p = new Cacodemon(...args, cbFor('caco')); break;
             case 'DoomSlayer': p = new DoomSlayer(...args, cbFor('slayer')); break;
             default:           return new Gnomelet(...args);

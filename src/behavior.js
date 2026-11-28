@@ -109,7 +109,7 @@ export class PointerTracker {
  * `lastReason` diz por que a última consulta não abriu portal (para o log).
  */
 export class PortalGate {
-    constructor({ cooldown = 400, chance = 0.5, maxActive = 3, weights = { Imp: 3, Cacodemon: 1 } } = {}, rng = Math.random) {
+    constructor({ cooldown = 400, chance = 0.5, maxActive = 3, weights = { Imp: 3, Imp2: 3, Cacodemon: 1 } } = {}, rng = Math.random) {
         Object.assign(this, { cooldown, chance, maxActive, weights, rng });
         this._cool = 0;
         this.lastReason = '';

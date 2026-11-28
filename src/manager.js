@@ -17,7 +17,7 @@ import { NOTICE_RANGE, PORTAL_DEMON_TTL, DEFAULT_TYPES } from './utils.js';
 import { isWindowMaximized, UPDATE_INTERVAL_MS } from './utils.js';
 
 const SLAYER = 'DoomSlayer';   // sempre exatamente um em cena quando selecionado
-const DEMONS = ['Imp', 'Cacodemon'];
+const DEMONS = ['Imp', 'Imp2', 'Cacodemon'];   // Imp2: variação visual do Imp (mesma classe e IA)
 const DEMON_RESPAWN_MIN = 100;   // ticks (~5s)
 const DEMON_RESPAWN_MAX = 200;   // ticks (~10s)
 
@@ -849,7 +849,8 @@ export const GnomeletManager = GObject.registerClass(
             const args = [type, frames, w, h, this._settings, provider];
             const cbFor = (owner) => (x, y, vx, vy, dmg) => this._spawnProjectile(x, y, vx, vy, owner, dmg);
             switch (type) {
-                case 'Imp':        return new Imp(...args, cbFor('imp'));
+                case 'Imp':
+                case 'Imp2':       return new Imp(...args, cbFor('imp'));
                 case 'Cacodemon':  return new Cacodemon(...args, cbFor('caco'));
                 case 'DoomSlayer': return new DoomSlayer(...args, cbFor('slayer'));
                 default:           return new Gnomelet(...args);
@@ -869,7 +870,7 @@ export const GnomeletManager = GObject.registerClass(
         _updateProjectiles() {
             if (this._projectiles.length === 0) return;
             const slayers = this._gnomelets.filter(g => g._typeName === 'DoomSlayer');
-            const enemies = this._gnomelets.filter(g => g._typeName === 'Imp' || g._typeName === 'Cacodemon');
+            const enemies = this._gnomelets.filter(g => DEMONS.includes(g._typeName));
             this._projectiles = this._projectiles.filter(p => {
                 p.update(p.owner === 'slayer' ? enemies : slayers);
                 if (!p.alive) { p.destroy(); return false; }
