@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Doomelets Settings
+GenericName=Desktop pets settings
+Comment=Change the size, number, speed and behaviour of the Doomelets
+Exec=kcmshell6 kwin/effects/configs/kcm_kwin4_genericscripted --args "doomelets KWin/Script"
+Icon=applications-games
+Categories=Qt;KDE;Settings;
+Keywords=doom;pets;doomelets;kwin;
+StartupNotify=true
+X-KDE-Shortcuts=Meta+Ctrl+S

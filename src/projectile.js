@@ -1,5 +1,6 @@
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import { placeActor } from './motion.js';
 
 // Aparência por dono: tamanho (px) e estilo CSS
 const LOOKS = {
@@ -43,7 +44,7 @@ export class Projectile {
 
         this._x += this.vx;
         this._y += this.vy;
-        this.actor.set_position(Math.floor(this._x), Math.floor(this._y));
+        placeActor(this.actor, Math.floor(this._x), Math.floor(this._y));
 
         if (++this._ticks > MAX_LIFETIME_TICKS ||
             this._x < -50 || this._x > global.stage.width + 50 ||

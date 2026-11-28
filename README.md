@@ -95,6 +95,16 @@ dconf dump /org/gnome/shell/extensions/gnomelets/ | dconf load /org/gnome/shell/
 
 If you also use Gnomelets, those old settings may be its own, so check them before copying. The saved state only holds character positions and does not need to be migrated.
 
+## KDE Plasma version (KWin script)
+
+The `kwin-port` branch also runs on **KDE Plasma 6 (Wayland)** as a KWin script, in `kwin/`. It uses the same characters, AI and sprites, and adds a settings window with game speed, demon respawn time and health per Doom character.
+
+```bash
+./scripts/kwin.sh install     # then open "Doomelets Settings" from the app menu (or Meta+Ctrl+S)
+```
+
+See [KDE_PLASMA.md](KDE_PLASMA.md) for installation, settings, shortcuts, differences from the GNOME version and development notes.
+
 ## Configuration
 
 * **Character selection:** choose one or more characters. The list includes every folder in the `images` directory.
@@ -130,7 +140,7 @@ Instead of the fixed numbering above, a character folder may describe its animat
 { "walk": { "frames": [0, 1, 2, 3, 4, 5, 6, 7], "ticks": 2, "loop": true } }
 ```
 
-Names: `walk`, `run`, `float`, `idle`, `jump`, `fall`, `attack`, `glory`, `hurt`, `death`, `held` (dragged by the user), `pet`, plus the Doom Slayer idle variations `reload` and `look`. If you provide a manifest, include every state the character can reach.
+Names: `walk`, `run`, `float`, `idle`, `jump`, `fall`, `attack`, `glory`, `hurt`, `death`, `held` (dragged by the user), `pet`, plus the idle variations `reload` and `look` (Doom Slayer) and `taunt` (Imp, optional). If you provide a manifest, include every state the character can reach.
 
 ## Development
 
@@ -138,9 +148,27 @@ Names: `walk`, `run`, `float`, `idle`, `jump`, `fall`, `attack`, `glory`, `hurt`
 |---|---|
 | `src/` | The extension. `manager.js` handles spawning, `gnomelet.js` the base character and `projectile.js` the projectiles. |
 | `src/characters/` | The Doom Slayer, Imp and Cacodemon classes. |
-| `src/images/` | One folder of frames per character. |
+| `src/images/` | One folder of frames per character (shared with the KWin version). |
+| `kwin/` | The KDE Plasma port (see [KDE_PLASMA.md](KDE_PLASMA.md)). |
+| `scripts/kwin.sh` | Builds, installs and hot-loads the KWin version. |
 | `demo/` | three.js rigs for the Doom characters. |
 | `scripts/render_doom_sprites.py` | Renders the rigs to PNG frames and writes `animations.json`. |
+
+Behaviour logic that does not need GNOME (idle variant picking, pointer curiosity, steering) lives in `src/behavior.js` and is unit tested. The real character classes are also exercised against a stubbed Shell:
+
+```bash
+node --test tests/behavior.test.mjs
+node --import ./tests/support/register.mjs --test tests/gnomelet.test.mjs
+```
+
+Window events and scenes:
+
+* **Portals:** opening a window sometimes (50%, at most every ~20 s, up to 5 demons alive) opens a fire portal on its top edge and drops an Imp or Cacodemon, but only types selected in the preferences. These demons leave through another portal after about 2 minutes and do not respawn.
+* **Attention:** a window opening, closing or minimizing makes nearby walking or idle characters stop and look toward it for ~1.5 s (the `look` / `taunt` reaction plays if the manifest has it).
+* **Cowardly Imp:** at 1 hit point the Imp runs away from the Doom Slayer instead of fighting, unless cornered at a screen edge.
+* **Guarding the cursor:** if the mouse has not moved for ~30 s and there are no enemies, the Doom Slayer walks over and stands guard next to it.
+
+Pointer interaction: a character left idle near the cursor turns to face it; after about 3 s it plays its `stare` reaction (`look` for the Doom Slayer, `taunt` for the Imp once that animation exists in its manifest). The Cacodemon drifts toward the cursor but keeps its distance. Movement between logic ticks (20 Hz) is interpolated, so motion on screen is continuous.
 
 To regenerate the Doom sprites (needs the Python packages `playwright` and `pillow`, plus a Playwright browser):
 

@@ -1,0 +1,20 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Authors": [
+            { "Name": "carlosbrito92" },
+            { "Name": "ihpled (Gnomelets)" }
+        ],
+        "Description": "Doom-themed desktop pets for KDE Plasma. Imps run across your windows, Cacodemons float above them, and the Doom Slayer hunts them all down.",
+        "EnabledByDefault": false,
+        "Icon": "applications-games",
+        "Id": "doomelets",
+        "License": "GPL-3.0-or-later",
+        "Name": "Doomelets",
+        "Version": "1",
+        "Website": "https://github.com/carlosbrito92/doomelets"
+    },
+    "X-KDE-ConfigModule": "kwin/effects/configs/kcm_kwin4_genericscripted",
+    "X-Plasma-API": "declarativescript",
+    "X-Plasma-MainScript": "ui/main.qml"
+}
