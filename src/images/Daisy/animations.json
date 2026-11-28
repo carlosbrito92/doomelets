@@ -10,7 +10,7 @@
    6,
    7
   ],
-  "ticks": 2,
+  "ticks": 3,
   "loop": true
  },
  "run": {
@@ -24,7 +24,7 @@
    14,
    15
   ],
-  "ticks": 1.5,
+  "ticks": 2,
   "loop": true
  },
  "idle": {
@@ -34,35 +34,37 @@
    18,
    19,
    20,
-   21
+   21,
+   22,
+   23
   ],
   "ticks": 5,
   "loop": true
  },
  "jump": {
   "frames": [
-   22,
-   23,
-   24
+   24,
+   25,
+   26
   ],
   "ticks": 3,
   "loop": false
  },
  "fall": {
   "frames": [
-   25,
-   26,
-   27
+   27,
+   28,
+   29
   ],
   "ticks": 3,
   "loop": false
  },
  "held": {
   "frames": [
-   28,
-   29,
    30,
-   31
+   31,
+   32,
+   33
   ],
   "ticks": 4,
   "loop": true
