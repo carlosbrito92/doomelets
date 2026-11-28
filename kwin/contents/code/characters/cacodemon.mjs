@@ -113,7 +113,7 @@ export class Cacodemon extends Gnomelet {
 
         // Movimento horizontal: deriva com bounce nas bordas, ou acompanha o cursor (tímido:
         // mantém CACO_FOLLOW_STOP de distância) com viragem suave
-        this._velX ??= this._floatSpeedX;
+        if (this._velX === undefined) this._velX = this._floatSpeedX;   // sem `??=`: o QML do KWin não o aceita
         let wantVx = this._floatSpeedX;
         const ptr = this._pointer;
         if (ptr && ptr.dist < CACO_FOLLOW_RANGE && this._state === State.FLOATING) {

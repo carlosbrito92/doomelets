@@ -1,6 +1,6 @@
 # Doomelets on KDE Plasma
 
-Doomelets started as a GNOME Shell extension. This document covers the port to **KDE Plasma 6 on Wayland**, which lives in `kwin/` on the `kwin-port` branch. The GNOME extension in `src/` is unchanged, and `main` remains the GNOME branch.
+Doomelets started as a GNOME Shell extension. This document covers the port to **KDE Plasma 6 on Wayland**, which lives in `kwin/`. The GNOME extension in `src/` keeps working as before; both share the sprites in `src/images/` and the behaviour logic in `src/behavior.js`.
 
 ## Why a port was needed
 
@@ -24,7 +24,7 @@ The one place in Plasma with both window information and the ability to draw on 
 Requirements: KDE Plasma 6 on Wayland (tested on Plasma 6.8 / Fedora 44), plus `kpackagetool6`, `kwriteconfig6` and `python3`. These are present on a normal Plasma install.
 
 ```bash
-git clone -b kwin-port https://github.com/carlosbrito92/doomelets.git
+git clone https://github.com/carlosbrito92/doomelets.git
 cd doomelets
 ./scripts/kwin.sh install
 ```
@@ -53,7 +53,10 @@ The behaviour logic is shared with GNOME: `src/behavior.js` is copied into the p
 
 ```bash
 node --import ./tests/support/kwin-register.mjs --test tests/kwin.test.mjs
+node --test tests/kwin-syntax.test.mjs
 ```
+
+The second command checks that the package avoids JavaScript syntax the KWin QML engine rejects (for example `??=`), which would stop the whole script from loading.
 
 The QML side (window signals, portal item, gliding) is only checked for syntax here; try it on a real session with `./scripts/kwin.sh dev`.
 

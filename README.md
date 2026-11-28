@@ -97,7 +97,7 @@ If you also use Gnomelets, those old settings may be its own, so check them befo
 
 ## KDE Plasma version (KWin script)
 
-The `kwin-port` branch also runs on **KDE Plasma 6 (Wayland)** as a KWin script, in `kwin/`. It uses the same characters, AI and sprites, and adds a settings window with game speed, demon respawn time and health per Doom character.
+Doomelets also runs on **KDE Plasma 6 (Wayland)** as a KWin script, in `kwin/`. A GNOME Shell extension cannot simply be reused there: it draws with Shell internals (Clutter/St), reads window positions through `Meta.Window`, and uses GSettings, none of which exist under KWin, so the logic was ported to a KWin script (see *Why a port was needed* in [KDE_PLASMA.md](KDE_PLASMA.md)). It uses the same characters, AI and sprites, and adds a settings window with game speed, demon respawn time and health per Doom character.
 
 ```bash
 ./scripts/kwin.sh install     # then open "Doomelets Settings" from the app menu (or Meta+Ctrl+S)
