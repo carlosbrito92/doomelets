@@ -123,7 +123,7 @@ function manager(strv) {
         collectWindows: () => ({ windows: [], forceBackground: false, stack: [] }),
     };
     const m = new GnomeletManager(settings(strv), host);
-    for (const n of ['Imp', 'Cacodemon', 'DoomSlayer']) m._resources[n] = { frames: frames(n), w: 144, h: 153 };
+    for (const n of ['Imp', 'Cacodemon', 'DoomSlayer', 'DoomEternal']) m._resources[n] = { frames: frames(n), w: 144, h: 153 };
     m._portalGate.rng = () => 0; m._portalGate.chance = 1;
     return { m, portalViews, pointer, rects };
 }
@@ -219,4 +219,20 @@ test('manager (KWin): sem seleção usa os personagens padrão (e nunca o Slayer
     const types = new Set();
     for (let i = 0; i < 40; i++) types.add(m._pickResource().type);
     assert.deepEqual([...types].sort(), ['Cacodemon', 'Imp']);
+});
+
+test('manager: Slayer Eternal entra no lugar do clássico; com os dois marcados, só o clássico (um Slayer por vez)', () => {
+    const slayers = m => m.gnomelets.filter(g => ['DoomSlayer', 'DoomEternal'].includes(g._typeName)).map(g => g._typeName);
+    const a = manager(['DoomEternal', 'Imp']).m; a._spawnGnomelets(null);
+    assert.deepEqual(slayers(a), ['DoomEternal']);
+    const b = manager(['DoomEternal', 'DoomSlayer', 'Imp']).m; b._spawnGnomelets(null);
+    assert.deepEqual(slayers(b), ['DoomSlayer']);
+});
+
+test('Imp reconhece o Slayer Eternal como ameaça', () => {
+    const imp = make(Imp, 'Imp'); ground(imp); imp._x = 800;
+    const eternal = make(DoomSlayer, 'DoomEternal'); ground(eternal); eternal._x = 600;
+    imp._allEntities = [eternal, imp];
+    imp._hp = 1; imp._pickNewAction();
+    assert.equal(imp._state, State.CHASING); assert.ok(imp._vx > 0);
 });

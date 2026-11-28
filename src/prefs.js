@@ -54,21 +54,28 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
                 // Ensure we have a set for easier lookup
                 let selectedSet = new Set(currentTypes);
 
+                // As duas versões do Doom Slayer funcionam como um toggle: marcar uma desmarca a outra
+                const SLAYERS = ['DoomSlayer', 'DoomEternal'];
+                const checks = {};
                 types.forEach(type => {
                     const row = new Adw.ActionRow({ title: type });
                     const check = new Gtk.CheckButton({
                         active: selectedSet.has(type),
                         valign: Gtk.Align.CENTER,
                     });
+                    checks[type] = check;
 
                     check.connect('toggled', () => {
                         let current = new Set(settings.get_strv('gnomelet-type'));
+                        const others = check.active && SLAYERS.includes(type) ? SLAYERS.filter(t => t !== type) : [];
                         if (check.active) {
                             current.add(type);
+                            others.forEach(t => current.delete(t));
                         } else {
                             current.delete(type);
                         }
                         settings.set_strv('gnomelet-type', [...current]);
+                        others.forEach(t => { if (checks[t]?.active) checks[t].active = false; });
                     });
 
                     row.add_suffix(check);

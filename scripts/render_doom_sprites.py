@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Renderiza os sprites do Doom Slayer, Imp, Imp 2, Cacodemon, Lost Soul, Pinky e Daisy a partir dos rigs three.js em demo/.
+"""Renderiza os sprites do Doom Slayer, Doom Slayer Eternal, Imp, Imp 2, Cacodemon, Lost Soul, Pinky e Daisy a partir dos rigs three.js em demo/.
 
 Requer: pip install playwright pillow && playwright install chromium
 Uso:    python3 scripts/render_doom_sprites.py [pasta_de_saida]   (padrão: src/images)
@@ -37,6 +37,22 @@ HURT = seq('hurt', 0.18, 0.30, 0.65)
 # A ordem das entradas define a numeração dos PNGs ('walk' primeiro: 0.png é o quadro de prévia).
 CHARS = {
     'DoomSlayer': dict(page='doomguy-rig.html', yaw=60, pitch=8, anims={
+        'walk': A(loop('walk', 8), 2),
+        'run': A(loop('run', 8), 1.5),
+        'idle': A(loop('idle', 6), 5),
+        'reload': A(seq('reload', 0.06, 0.12, 0.22, 0.32, 0.42, 0.52, 0.62, 0.70, 0.78, 0.85, 0.92, 0.98), 4, False),
+        'look': A(seq('look', 0.07, 0.18, 0.28, 0.38, 0.48, 0.58, 0.70, 0.80, 0.90, 0.97), 5, False),
+        'jump': A(seq('jumpUp', 0.34, 0.45, 0.55, 0.66), 3, False),
+        'fall': A(seq('jumpDown', 0.32, 0.42, 0.52), 3, False),
+        # os balins saem no primeiro tick: o clarão é o quadro 0
+        'attack': A(seq('shoot', 0.05, 0.14, 0.25, 0.38, 0.52, 0.65, 0.78, 0.92), 1.5, False),
+        'glory': A(seq('glory', 0.08, 0.20, 0.30, 0.40, 0.50, 0.62, 0.78, 0.92), 3, False),
+        'hurt': A(HURT, 2, False),
+        'death': A(DEATH, 2, False),
+        'held': A(loop('held', 4), 4),
+        'pet': A(loop('pet', 4), 4),
+    }),
+    'DoomEternal': dict(page='slayer-eternal-rig.html', yaw=60, pitch=8, anims={
         'walk': A(loop('walk', 8), 2),
         'run': A(loop('run', 8), 1.5),
         'idle': A(loop('idle', 6), 5),

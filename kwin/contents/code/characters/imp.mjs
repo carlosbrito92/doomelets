@@ -7,6 +7,7 @@ import {
     IMP_WALK_SPEED,
     IMP_CHASE_SPEED,
     platform,
+    SLAYER_TYPES,
 } from '../utils.mjs';
 
 /**
@@ -50,7 +51,7 @@ export class Imp extends Gnomelet {
     _pickNewAction() {
         // Procurar Slayer entre as entidades (injetadas via update())
         const slayer = this._allEntities
-            ? this._allEntities.find(e => e._typeName === 'DoomSlayer')
+            ? this._allEntities.find(e => SLAYER_TYPES.includes(e._typeName))
             : null;
 
         if (slayer && slayer.actor) {

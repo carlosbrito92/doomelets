@@ -9,6 +9,7 @@ import {
     CACO_FOLLOW_STOP,
     CACO_FOLLOW_SPEED,
     CACO_FOLLOW_ACCEL,
+    SLAYER_TYPES,
 } from '../utils.js';
 import { steerToward } from '../behavior.js';
 
@@ -125,7 +126,7 @@ export const Cacodemon = GObject.registerClass(
             this._y = anchorY + Math.sin(this._floatTimer * FLOAT_FREQUENCY) * FLOAT_AMPLITUDE;
 
             // IA: detectar Slayer e disparar
-            const slayer = allEntities.find(e => e._typeName === 'DoomSlayer');
+            const slayer = allEntities.find(e => SLAYER_TYPES.includes(e._typeName));
             if (slayer && slayer.actor) {
                 const dx = slayer._x - this._x;
                 const dy = slayer._y - this._y;
@@ -150,7 +151,7 @@ export const Cacodemon = GObject.registerClass(
         }
 
         _fire(allEntities) {
-            const slayer = allEntities.find(e => e._typeName === 'DoomSlayer');
+            const slayer = allEntities.find(e => SLAYER_TYPES.includes(e._typeName));
             if (!slayer || !slayer.actor) return;
             if (!this._spawnProjectileCb) {
                 slayer.takeDamage(2);
