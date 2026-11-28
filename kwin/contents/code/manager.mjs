@@ -249,6 +249,7 @@ export class GnomeletManager {
     /** Janela nova: espera ~300 ms (6 ticks) pelo primeiro frame antes de olhar a geometria. */
     onWindowAdded(win) {
         if (this._isPaused || !win) return;
+        console.warn('Doomelets: janela nova detectada');
         this._pendingWindows.push({ win, ticks: 6 });
     }
 
@@ -264,6 +265,7 @@ export class GnomeletManager {
             if (--entry.ticks > 0) return true;
             const rect = this._host.windowRect(entry.win);
             if (rect && rect.width >= 160 && rect.height >= 120) this._onWindowReady(rect);
+            else console.warn('Doomelets: janela nova ignorada (sem geometria válida, minimizada ou pequena demais)');
             return false;
         });
     }
@@ -276,10 +278,14 @@ export class GnomeletManager {
 
     /** Solta um demônio (efêmero) no topo de `rect`, se o portão permitir. Devolve-o ou null. */
     _portalDemon(rect) {
-        const active = this._gnomelets.filter(g => DEMONS.includes(g._typeName)).length + this._demonQueue.length;
+        // O teto vale só para demônios de portal: a contagem normal do usuário não bloqueia portais
+        const active = this._gnomelets.filter(g => g._ephemeral).length;
         const selected = this._settings.get_strv('gnomelet-type');
         const type = this._portalGate.consider(active, n => Boolean(this._resources[n]) && selected.includes(n));
-        if (!type) return null;
+        if (!type) {
+            console.warn(`Doomelets: janela nova sem portal (${this._portalGate.lastReason})`);
+            return null;
+        }
         const res = this._pickResource(type);
         if (!res) return null;
         const p = this._addCharacter(res);
@@ -287,6 +293,7 @@ export class GnomeletManager {
         p._portalTtl = PORTAL_DEMON_TTL;
         const at = p.arriveAt(rect);
         this._addPortal(at.x, at.y);
+        console.warn(`Doomelets: portal aberto, saiu um ${type}`);
         return p;
     }
 

@@ -746,10 +746,14 @@ export const GnomeletManager = GObject.registerClass(
 
         /** Solta um demônio (efêmero) no topo de `rect`, se o portão permitir. Devolve-o ou null. */
         _portalDemon(rect) {
-            const active = this._gnomelets.filter(g => DEMONS.includes(g._typeName)).length + this._demonQueue.length;
+            // O teto vale só para demônios de portal: a contagem normal do usuário não bloqueia portais
+            const active = this._gnomelets.filter(g => g._ephemeral).length;
             const selected = this._settings.get_strv('gnomelet-type');
             const type = this._portalGate.consider(active, n => Boolean(this._resources[n]) && selected.includes(n));
-            if (!type) return null;
+            if (!type) {
+                console.log(`Doomelets: janela nova sem portal (${this._portalGate.lastReason})`);
+                return null;
+            }
             const res = this._pickResource(type);
             if (!res) return null;
             const p = this._addCharacter(res);

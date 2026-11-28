@@ -184,3 +184,32 @@ test('manager: janela fechando faz os próximos olharem; ponteiro parado é cont
     pointer.x = 900; m.tick();
     assert.equal(near._pointer.still, 0);
 });
+
+test('manager: com a contagem alta do usuário (7 demônios já em cena) a janela nova ainda abre portal', () => {
+    const { m, rects } = manager();
+    for (let i = 0; i < 6; i++) m._gnomelets.push(make(Imp, 'Imp'));
+    m._gnomelets.push(make(Cacodemon, 'Cacodemon'));
+    assert.equal(m._gnomelets.length, 7);
+    const win = {}; rects.set(win, { x: 200, y: 300, width: 900, height: 600 });
+    m.onWindowAdded(win);
+    for (let i = 0; i < 8; i++) m.tick();
+    assert.equal(m._gnomelets.filter(g => g._ephemeral).length, 1, 'um demônio de portal');
+});
+
+test('manager: o teto vale só para demônios de portal (3), não para o total', () => {
+    const { m, rects } = manager();
+    m._portalGate.cooldown = 0;
+    const win = {}; rects.set(win, { x: 200, y: 300, width: 900, height: 600 });
+    for (let k = 0; k < 6; k++) { m.onWindowAdded(win); for (let i = 0; i < 7; i++) m.tick(); }
+    assert.equal(m._gnomelets.filter(g => g._ephemeral).length, 3);
+});
+
+test('PortalGate explica por que não abriu (lastReason), para o log', async () => {
+    const { PortalGate } = await import('../src/behavior.js');
+    const g = new PortalGate({ chance: 0, maxActive: 1 }, () => 0.9);
+    assert.equal(g.consider(0), null); assert.equal(g.lastReason, 'sem sorte');
+    const h = new PortalGate({ chance: 1, maxActive: 1 }, () => 0);
+    assert.equal(h.consider(1), null); assert.equal(h.lastReason, 'teto de demônios de portal');
+    assert.equal(h.consider(0, () => false), null); assert.equal(h.lastReason, 'nenhum tipo disponível');
+    assert.ok(h.consider(0)); assert.equal(h.consider(0), null); assert.equal(h.lastReason, 'intervalo');
+});
