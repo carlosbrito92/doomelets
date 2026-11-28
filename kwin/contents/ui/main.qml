@@ -19,7 +19,7 @@ import "../code/sprites.mjs" as Sprites
 Item {
     id: root
 
-    readonly property var characterTypes: ["DoomSlayer", "Imp", "Cacodemon"]
+    readonly property var characterTypes: ["DoomSlayer", "Imp", "Cacodemon", "Daisy", "Pinky", "LostSoul"]
     readonly property var floorModes: ["allow", "partial", "disallow"]
 
     property var manager: null
@@ -43,7 +43,7 @@ Item {
 
     function readCfg() {
         const types = characterTypes.filter(t =>
-            readBool("Type" + t, t === "DoomSlayer" || t === "Imp" || t === "Cacodemon"));
+            readBool("Type" + t, true));
         return {
             "gnomelet-count": Math.max(0, Math.min(50, readInt("Count", 5))),
             "gnomelet-scale": Math.max(16, Math.min(512, readInt("Scale", 64))),

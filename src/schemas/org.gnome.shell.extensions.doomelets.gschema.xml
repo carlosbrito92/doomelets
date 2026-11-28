@@ -37,7 +37,7 @@
       </description>
     </key>
     <key name="gnomelet-type" type="as">
-      <default>['DoomSlayer', 'Imp', 'Cacodemon']</default>
+      <default>['DoomSlayer', 'Imp', 'Cacodemon', 'Daisy', 'Pinky', 'LostSoul']</default>
       <summary>Gnomelet Characters</summary>
       <description>The kinds of gnomelet to display. If multiple are selected, they will be chosen randomly.</description>
     </key>

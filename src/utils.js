@@ -16,7 +16,7 @@ export const NOTICE_PAUSE_TICKS = 30;   // ticks parado olhando (~1,5 s)
 export const PORTAL_DEMON_TTL = 2400;   // ticks que um demônio de portal fica (~2 min) antes de sumir
 export const GUARD_AFTER_TICKS = 600;   // ticks de cursor parado até o Slayer vir guardá-lo (~30 s)
 // Personagens selecionados quando nada (ou nada que ainda exista) está salvo nas configurações
-export const DEFAULT_TYPES = ['DoomSlayer', 'Imp', 'Cacodemon'];
+export const DEFAULT_TYPES = ['DoomSlayer', 'Imp', 'Cacodemon', 'Daisy', 'Pinky', 'LostSoul'];
 export const GRAVITY = 2;             // Vertical acceleration per frame
 export const WALK_SPEED = 3;          // Horizontal pixels per frame
 

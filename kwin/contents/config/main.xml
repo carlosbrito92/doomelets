@@ -52,5 +52,14 @@
     <entry name="TypeCacodemon" type="bool">
       <default>true</default>
     </entry>
+    <entry name="TypeDaisy" type="bool">
+      <default>true</default>
+    </entry>
+    <entry name="TypePinky" type="bool">
+      <default>true</default>
+    </entry>
+    <entry name="TypeLostSoul" type="bool">
+      <default>true</default>
+    </entry>
   </group>
 </kcfg>

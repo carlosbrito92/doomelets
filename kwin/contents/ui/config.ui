@@ -307,6 +307,27 @@
         </property>
        </widget>
       </item>
+      <item row="1" column="0">
+       <widget class="QCheckBox" name="kcfg_TypeDaisy">
+        <property name="text">
+         <string>Daisy</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QCheckBox" name="kcfg_TypePinky">
+        <property name="text">
+         <string>Pinky</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QCheckBox" name="kcfg_TypeLostSoul">
+        <property name="text">
+         <string>Lost Soul</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
