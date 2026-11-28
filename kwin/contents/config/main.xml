@@ -55,6 +55,9 @@
     <entry name="TypeDaisy" type="bool">
       <default>true</default>
     </entry>
+    <entry name="TypeDoomEternal" type="bool">
+      <default>false</default>
+    </entry>
     <entry name="TypeImp2" type="bool">
       <default>false</default>
     </entry>

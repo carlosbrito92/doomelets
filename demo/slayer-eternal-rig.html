@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Doom Slayer Eternal · Pixel Rig</title>
+<style>
+  :root{--bg:#15110f;--panel:#1d1815;--rule:#4a3a30;--ink:#e8dcc4;--soft:#9a8c78;--hot:#d8571a;--green:#6fb04a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}
+  h1{margin:0;font:800 26px/1 Impact,'Arial Narrow',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--hot)}
+  header{padding:14px 18px;border-bottom:1px solid var(--rule)}
+  header p{margin:4px 0 0;color:var(--soft)}
+  main{display:grid;grid-template-columns:minmax(320px,1fr) 360px;gap:0;min-height:calc(100vh - 70px)}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  .stagecol{padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;border-right:1px solid var(--rule)}
+  #stage{border:1px solid var(--rule);cursor:grab;touch-action:none;
+    background:conic-gradient(#2a221d 25%,#241d19 0 50%,#2a221d 0 75%,#241d19 0) 0 0/16px 16px}
+  #stage:active{cursor:grabbing}
+  #view{display:block;width:100%;height:100%;image-rendering:pixelated}
+  .row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .ctrl{padding:14px 16px;overflow:auto;background:var(--panel)}
+  .sec{border-top:1px solid var(--rule);padding-top:10px;margin-top:14px}
+  .sec:first-child{border-top:0;margin-top:0;padding-top:0}
+  h2{margin:0 0 8px;font:600 11px/1 inherit;letter-spacing:.16em;text-transform:uppercase;color:var(--soft)}
+  button,select{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--rule);padding:7px 10px;cursor:pointer;border-radius:2px}
+  button:hover{border-color:var(--soft)}
+  button[aria-pressed=true]{background:var(--hot);border-color:var(--hot);color:#140c08}
+  button.main{background:var(--green);border-color:var(--green);color:#0d1a08}
+  .sl{display:grid;grid-template-columns:96px 1fr 44px;gap:8px;align-items:center;min-height:28px}
+  .sl output{text-align:right;color:var(--soft);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--hot)}
+  .tog{display:flex;gap:8px;align-items:center;min-height:28px;cursor:pointer}
+  .pal{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}
+  .pal li{display:flex;justify-content:space-between;align-items:center}
+  .sw{display:flex}.sw i{width:16px;height:14px;display:block}
+  #status{color:var(--soft);min-height:18px;margin:8px 0 0}
+  .fail{padding:30px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>Doom Slayer Eternal · Pixel Rig</h1>
+  <p>Rig de primitivas suaves (esferas, cilindros, placas) em three.js, renderizado em baixa resolução com 3 tons + pontilhado + contorno. Nada de cubos.</p>
+</header>
+<main>
+  <section class="stagecol">
+    <div id="stage"><canvas id="view"></canvas></div>
+    <div class="row" id="views"></div>
+    <div class="row">
+      <button id="play" aria-pressed="true">⏸ Pausar</button>
+      <button id="prev">◀ Quadro</button>
+      <button id="next">Quadro ▶</button>
+    </div>
+    <div style="width:min(420px,100%)">
+      <div class="sl"><label for="frame">Quadro</label><input type="range" id="frame" min="0" max="7" step="1" value="0"><output id="frameo">1/8</output></div>
+      <div class="sl"><label for="speed">Velocidade</label><input type="range" id="speed" min="0.2" max="2" step="0.05" value="1"><output id="speedo">1×</output></div>
+    </div>
+    <p id="status"></p>
+  </section>
+
+  <section class="ctrl">
+    <div class="sec"><h2>Animações</h2><div class="row" id="anims" style="justify-content:flex-start"></div></div>
+
+    <div class="sec">
+      <h2>Articulação (edita e congela a pose)</h2>
+      <div class="row" id="joints" style="justify-content:flex-start"></div>
+      <div class="sl"><label for="jx">Frente ↔ trás</label><input type="range" id="jx" min="-180" max="180" value="0"><output id="jxo">0°</output></div>
+      <div class="sl"><label for="jy">Torção</label><input type="range" id="jy" min="-180" max="180" value="0"><output id="jyo">0°</output></div>
+      <div class="sl"><label for="jz">Lateral</label><input type="range" id="jz" min="-180" max="180" value="0"><output id="jzo">0°</output></div>
+    </div>
+
+    <div class="sec">
+      <h2>Câmera</h2>
+      <div class="sl"><label for="yaw">Giro</label><input type="range" id="yaw" min="0" max="359" value="35"><output id="yawo">35°</output></div>
+      <div class="sl"><label for="pitch">Inclinação</label><input type="range" id="pitch" min="-25" max="50" value="10"><output id="pitcho">10°</output></div>
+    </div>
+
+    <div class="sec">
+      <h2>Estilo</h2>
+      <label class="tog"><input type="checkbox" id="t-outline" checked>Contorno</label>
+      <label class="tog"><input type="checkbox" id="t-dither" checked>Pontilhado</label>
+      <div class="row" style="justify-content:flex-start;align-items:center;margin-top:6px">
+        <label for="res">Resolução</label>
+        <select id="res"><option value="64">64 × 64</option><option value="96" selected>96 × 96</option><option value="128">128 × 128</option></select>
+      </div>
+    </div>
+
+    <div class="sec"><h2>Paleta</h2><ul class="pal" id="pal"></ul></div>
+
+    <div class="sec">
+      <h2>Exportar</h2>
+      <div class="row" style="justify-content:flex-start;align-items:center;margin-bottom:8px">
+        <label for="scale">Escala</label>
+        <select id="scale"><option value="1">1×</option><option value="4" selected>4×</option><option value="8">8×</option></select>
+      </div>
+      <div class="row" style="flex-direction:column;align-items:stretch">
+        <button class="main" id="ex-frame">PNG do quadro atual</button>
+        <button id="ex-strip">Tira da animação (todos os quadros)</button>
+        <button id="ex-sheet">Folha de 8 ângulos (pose atual)</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+THREE.ColorManagement.enabled = false;
+
+const $ = id => document.getElementById(id);
+const D2R = Math.PI / 180;
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+
+/* ---------- paleta: 3 tons por peça (escuro → claro) ---------- */
+const PARTS = [
+  ['armor',  'Armadura',  ['#1c2e14', '#3e6a30', '#86b060']],
+  ['under',  'Junta',     ['#0e1012', '#2a2e33', '#555b63']],
+  ['visor',  'Plasma (luz)', ['#0a3a5a', '#30b0f0', '#c8f4ff']],
+  ['boot',   'Botas',     ['#1e1208', '#4a301a', '#7a5434']],
+  ['metal',  'Metal',     ['#202024', '#5a5a64', '#a8a8b4']],
+  ['gun',    'Arma',      ['#141416', '#34343a', '#6e6e7a']],
+  ['flash',  'Clarão de plasma', ['#1a60d8', '#50c0ff', '#e4f8ff']],
+  ['orange', 'Traje',     ['#6a2406', '#e0600f', '#ff9a3a']],
+  ['skin',   'Braços',    ['#4e2c14', '#a8683a', '#d99a66']],
+  ['cloth',  'Couro/ombreiras', ['#2e1c10', '#7a5230', '#b48a5a']],
+  ['tan',    'Sola/Placa',['#4a3a2a', '#8a735a', '#c2a888']],
+  ['glass',  'Visor azul', ['#082038', '#2a88c4', '#9adcf4']],
+  ['grille', 'Máscara',   ['#14161a', '#44484f', '#8a8e98']],
+  ['floor',  'Chão',      ['#1c1814', '#3a322a', '#5a5044']],
+  ['ledge',  'Plataforma',['#2a2620', '#5a5448', '#8a8270']],
+];
+const PART_ID = {}; PARTS.forEach((p, i) => PART_ID[p[0]] = i + 1);
+const RAMP = [null, ...PARTS.map(p => p[2].map(hex))];
+const INK = hex('#0b0908');
+const T1 = 0.55, T2 = 0.80;
+const BAYER = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v => (v + .5) / 16 - .5);
+
+/* ---------- three.js ---------- */
+let W = 96, H = 96;
+const stage = $('stage'), view = $('view'), vctx = view.getContext('2d');
+let renderer, gl;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  gl = renderer.getContext();
+} catch (e) {
+  stage.innerHTML = '<div class="fail">WebGL indisponível neste navegador.</div>';
+  throw e;
+}
+
+const scene = new THREE.Scene();
+const FH = 2.3;
+const cam = new THREE.OrthographicCamera(-FH / 2, FH / 2, FH / 2, -FH / 2, 0.1, 20);
+const rig = new THREE.Group();
+rig.position.set(0, 0.95, 0);
+rig.add(cam); cam.position.set(0, 0, 6);
+scene.add(rig);
+scene.add(new THREE.AmbientLight(0xffffff, 0.3 * Math.PI));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8 * Math.PI);
+sun.position.set(-2.2, 3.2, 4);
+rig.add(sun); rig.add(sun.target);
+
+const litMat = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+const depthMat = new THREE.MeshDepthMaterial({ side: THREE.DoubleSide });
+const idMats = {};
+PARTS.forEach(p => { idMats[p[0]] = new THREE.MeshBasicMaterial({ color: new THREE.Color(PART_ID[p[0]] * 16 / 255, 0, 0), side: THREE.DoubleSide }); });
+
+const grp = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
+function mesh(geo, part, x, y, z, parent, sx = 1, sy = 1, sz = 1) {
+  const m = new THREE.Mesh(geo, idMats[part]);
+  m.position.set(x, y, z); m.scale.set(sx, sy, sz);
+  parent.add(m); return m;
+}
+const ball = (r, part, x, y, z, p, sx, sy, sz) => mesh(new THREE.SphereGeometry(r, 14, 11), part, x, y, z, p, sx, sy, sz);
+function limb(rTop, rBot, len, part, parent, y = 0, sz = 1) {
+  const g = new THREE.CylinderGeometry(rTop, rBot, len, 14, 1);
+  g.translate(0, -len / 2, 0);
+  return mesh(g, part, 0, y, 0, parent, 1, 1, sz);
+}
+function trunk(rTop, rBot, h, part, parent, x, y, z, sz = 1) {
+  const g = new THREE.CylinderGeometry(rTop, rBot, h, 18, 1);
+  return mesh(g, part, x, y, z, parent, 1, 1, sz);
+}
+function tube(r, len, part, parent, x, y, z) {   // cilindro ao longo de +z
+  const g = new THREE.CylinderGeometry(r, r, len, 10, 1);
+  g.rotateX(Math.PI / 2);
+  return mesh(g, part, x, y, z, parent);
+}
+
+const model = new THREE.Group(); scene.add(model);
+const J = {};
+const allMeshes = [];
+const ARM_U = 0.25, ARM_F = 0.23;
+
+J.root = grp(model, 0, 1.0, 0);
+/* pélvis: cinto de couro com fivela, tassets (abas) marrons, faixa laranja */
+trunk(0.21, 0.24, 0.2, 'cloth', J.root, 0, 0.0, 0, 0.85);
+trunk(0.25, 0.25, 0.06, 'boot', J.root, 0, 0.09, 0, 0.85);
+mesh(new THREE.BoxGeometry(0.15, 0.085, 0.05), 'metal', 0, 0.09, 0.15, J.root);     // fivela
+mesh(new THREE.BoxGeometry(0.11, 0.055, 0.03), 'cloth', 0, 0.09, 0.18, J.root);
+ball(0.12, 'cloth', 0, -0.17, 0.14, J.root, 1.0, 1.6, 0.22);                         // aba frontal
+ball(0.115, 'cloth', 0, -0.17, -0.14, J.root, 1.0, 1.6, 0.22);                       // aba traseira
+ball(0.06, 'metal', 0, -0.33, 0.15, J.root, 1.4, 0.18, 0.3);                         // ponta da aba
+ball(0.075, 'cloth', 0.17, -0.02, 0.0, J.root, 0.7, 1.2, 1.1);                       // bolsas laterais
+ball(0.075, 'cloth', -0.17, -0.02, 0.0, J.root, 0.7, 1.2, 1.1);
+
+J.spine = grp(J.root, 0, 0.1, 0);
+trunk(0.21, 0.21, 0.22, 'orange', J.spine, 0, 0.1, 0, 0.85);                          // abdômen laranja
+trunk(0.34, 0.23, 0.36, 'armor', J.spine, 0, 0.31, 0, 0.8);                         // peitoral
+ball(0.2, 'armor', 0, 0.36, 0.1, J.spine, 1.45, 0.8, 0.6);                        // placa do peito
+for (let i = 0; i < 3; i++) ball(0.1, 'under', 0, 0.2 + i * 0.045, 0.245 + i * 0.006, J.spine, 1, 0.1, 0.32);  // sulcos
+ball(0.04, 'metal', 0.07, 0.43, 0.24, J.spine, 1, 0.8, 0.6);
+ball(0.025, 'visor', -0.12, 0.3, 0.25, J.spine, 1, 1, 0.5);                           // luz
+trunk(0.17, 0.2, 0.05, 'orange', J.spine, 0, 0.5, 0, 0.85);                          // gola laranja
+
+/* pescoço e cabeça: capacete, vidro verde-azulado, máscara com respirador e tubo */
+J.neck = grp(J.spine, 0, 0.55, 0);
+trunk(0.05, 0.06, 0.1, 'orange', J.neck, 0, 0.02, 0, 1);
+J.head = grp(J.neck, 0, 0.06, 0);
+J.head.scale.setScalar(1.75);
+ball(0.17, 'armor', 0, 0.15, -0.005, J.head, 1.1, 1.0, 1.08);                       // cúpula
+ball(0.075, 'armor', 0, 0.255, 0.07, J.head, 1.6, 0.5, 0.9);                          // placa da testa
+for (let k = -2; k <= 2; k++) ball(0.012, 'under', k * 0.03, 0.268, 0.115, J.head, 1, 3.2, 0.5);   // ventilação da testa
+ball(0.14, 'under', 0, 0.155, 0.1, J.head, 1.3, 0.62, 0.4);                          // aro escuro do visor
+ball(0.125, 'glass', 0, 0.16, 0.125, J.head, 1.34, 0.62, 0.4);                        // visor (parte larga)
+ball(0.09, 'glass', 0, 0.13, 0.13, J.head, 1.2, 0.4, 0.38);                            // visor (parte baixa, afunila)
+ball(0.03, 'visor', 0.07, 0.185, 0.165, J.head, 1.6, 0.3, 0.2);                          // reflexo do visor
+ball(0.105, 'grille', 0, 0.04, 0.09, J.head, 1.15, 0.7, 0.72);                      // máscara cinza
+for (let k = 0; k < 3; k++) ball(0.06, 'under', 0, 0.065 - k * 0.03, 0.15, J.head, 1.2, 0.1, 0.3);   // sulcos da máscara
+for (const sd of [-1, 1]) {
+  ball(0.05, 'metal', sd * 0.155, 0.1, 0.03, J.head, 0.5, 1.2, 1.2);                  // protetor lateral
+  ball(0.022, 'visor', sd * 0.165, 0.1, 0.05, J.head, 0.5, 1, 1);                     // luz lateral
+}
+ball(0.1, 'armor', 0, 0.09, -0.11, J.head, 1.1, 0.85, 0.8);                           // nuca
+ball(0.06, 'metal', 0, 0.16, -0.14, J.head, 1.2, 1.5, 0.6);                           // placa de ventilação traseira
+                            // nuca
+
+/* braços: bronze nus, braçadeira escura, luva marrom; esquerdo com escudo verde */
+function buildArm(side, tag) {
+  ball(0.23, 'cloth', side * 0.38, 0.42, 0, J.spine, 1.0, 0.85, 1.05);                 // ombreira marrom
+  ball(0.18, 'armor', side * 0.38, 0.5, 0, J.spine, 1.0, 0.5, 1.0);                  // tampa verde
+  ball(0.05, 'under', side * 0.38, 0.55, 0.05, J.spine, 1.4, 0.4, 1.1);                 // detalhe da ombreira
+  const sh = J['sh' + tag] = grp(J.spine, side * 0.36, 0.38, 0);
+  ball(0.12, 'skin', 0, 0, 0, sh);
+  limb(0.125, 0.11, ARM_U, 'skin', sh, 0);
+  const el = J['el' + tag] = grp(sh, 0, -ARM_U, 0);
+  ball(0.11, 'skin', 0, 0, 0, el);
+  limb(0.11, 0.1, ARM_F, 'skin', el, 0);
+  limb(0.115, 0.113, 0.07, 'under', el, -ARM_F + 0.08);                                 // faixa do pulso
+  ball(0.16, 'metal', 0, -0.11, 0.01, el, 1.0, 1.5, 1.05);                          // braçadeira blindada
+  for (let i = 0; i < 3; i++) ball(0.024, 'tan', 0, -0.06 - i * 0.06, 0.16, el);       // rebites
+  const wr = J['wr' + tag] = grp(el, 0, -ARM_F, 0);
+  ball(0.135, 'cloth', 0, -0.05, 0.005, wr, 1, 1.0, 1.1);                            // luva
+  if (tag === 'R') {                                                                   // lâmina do braço (Eternal)
+    const bg = grp(wr, 0, -0.12, 0.04); bg.rotation.x = 0.3;
+    mesh(new THREE.BoxGeometry(0.19, 0.05, 0.09), 'cloth', 0, 0, 0, bg);                        // guarda
+    for (const sx of [-0.07, 0.07]) ball(0.018, 'tan', sx, 0, 0.05, bg);                        // rebites
+    mesh(new THREE.BoxGeometry(0.12, 0.46, 0.03), 'metal', 0, -0.26, 0, bg);                   // lâmina larga
+    mesh(new THREE.BoxGeometry(0.02, 0.44, 0.045), 'under', 0.06, -0.26, 0, bg);              // dorso
+    const tp = mesh(new THREE.ConeGeometry(0.085, 0.16, 4), 'metal', 0, -0.57, 0, bg); tp.rotation.y = Math.PI / 4; tp.rotation.x = Math.PI; tp.scale.set(1, 1, 0.3); }
+  ball(0.04, 'tan', 0, -0.05, 0.05, wr, 1.3, 0.7, 0.6);                                // nós dos dedos
+}
+buildArm(1, 'L'); buildArm(-1, 'R');
+ball(0.11, 'orange', 0.2, 0.53, 0.0, J.spine, 1.7, 0.55, 1.2);                          // lenço laranja no ombro esquerdo
+
+/* pernas: coxote verde com friso cinza, joelheira bege, bota alta marrom com sola clara */
+function buildLeg(side, tag) {
+  const hip = J['hip' + tag] = grp(J.root, side * 0.14, -0.06, 0);
+  ball(0.13, 'cloth', 0, 0, 0, hip);
+  limb(0.145, 0.115, 0.3, 'armor', hip);
+  ball(0.07, 'armor', side * 0.12, -0.13, 0.02, hip, 0.5, 2.0, 1.3);                    // placa lateral
+  const kn = J['kn' + tag] = grp(hip, 0, -0.3, 0);
+  ball(0.115, 'under', 0, 0, 0, kn);
+  ball(0.13, 'tan', 0, 0.0, 0.07, kn, 1.1, 1.0, 0.8);                                   // joelheira
+  limb(0.115, 0.1, 0.28, 'boot', kn);                                                   // cano da bota
+  ball(0.09, 'tan', 0, -0.14, 0.08, kn, 0.9, 1.4, 0.55);                                // placa da canela
+  const an = J['an' + tag] = grp(kn, 0, -0.28, 0);
+  trunk(0.105, 0.12, 0.16, 'boot', an, 0, 0.0, 0, 1);
+  const g = new THREE.CapsuleGeometry(0.105, 0.16, 6, 12); g.rotateX(Math.PI / 2);
+  mesh(g, 'boot', 0, -0.085, 0.09, an, 1.1, 0.8, 1);                                    // bota grande
+  ball(0.105, 'tan', 0, -0.145, 0.1, an, 1.1, 0.28, 2.1);                               // sola
+  ball(0.08, 'tan', 0, -0.095, 0.21, an, 1.0, 0.75, 0.8);                               // biqueira
+}
+buildLeg(1, 'L'); buildLeg(-1, 'R');
+
+/* lançador de plasma no ombro direito (Eternal): articulado, levanta para trás em repouso e aponta para a frente ao atirar */
+const G = grp(J.spine, 0, 0, 0); G.visible = false;               // (herdado: a espingarda de mão não existe aqui)
+const pumpG = grp(G, 0, 0, 0); G.userData.flash = ball(0.01, 'flash', 0, 0, 0, G); G.userData.flash.visible = false;
+J.cannon = grp(J.spine, -0.5, 0.72, -0.06); J.cannon.scale.setScalar(1.2);
+(function () {
+  mesh(new THREE.BoxGeometry(0.17, 0.16, 0.46), 'armor', 0, 0, 0.12, J.cannon);                 // caixa verde
+  mesh(new THREE.BoxGeometry(0.18, 0.05, 0.3), 'metal', 0, 0.1, 0.1, J.cannon);                 // placa superior
+  mesh(new THREE.BoxGeometry(0.1, 0.1, 0.18), 'gun', 0, 0, 0.42, J.cannon);                     // boca
+  for (let k = 0; k < 3; k++) ball(0.055, 'visor', 0, -0.0, 0.18 + k * 0.1, J.cannon, 1.3, 1.1, 0.25);   // bobinas de plasma
+  ball(0.055, 'visor', 0, 0, 0.52, J.cannon, 1.0, 1.0, 0.5);
+  for (const sd of [-1, 1]) mesh(new THREE.BoxGeometry(0.03, 0.1, 0.22), 'gun', sd * 0.095, 0, 0.1, J.cannon);   // aletas
+  ball(0.07, 'metal', 0, -0.1, -0.02, J.cannon, 1.2, 1.1, 1);                                   // dobradiça
+  const f = ball(0.14, 'flash', 0, 0, 0.7, J.cannon, 1, 1, 1.6); f.visible = false; J.cannon.userData.flash = f;
+})();
+const GUN_REST = new THREE.Vector3(-0.1, 0.12, 0.26), GUN_AIM = new THREE.Vector3(-0.17, 0.37, 0.52);
+const GRIP_R = new THREE.Vector3(0, -0.075, -0.07);
+
+model.traverse(o => { if (o.isMesh) allMeshes.push(o); });
+
+/* cenário das animações de pulo: chão + degrau (fora do rig, não entra no cálculo de apoio dos pés) */
+const props = new THREE.Group(); scene.add(props); props.visible = false;
+const floorM = mesh(new THREE.BoxGeometry(3.2, 0.1, 3.2), 'floor', 0, -0.05, 0, props);
+const LEDGE_H = 0.7, LEDGE_EDGE = 0.2;
+const ledgeM = mesh(new THREE.BoxGeometry(1.2, LEDGE_H, 1.6), 'ledge', 0, LEDGE_H / 2, 0, props);
+mesh(new THREE.BoxGeometry(1.24, 0.06, 1.64), 'tan', 0, LEDGE_H / 2 - 0.03, 0, ledgeM);
+
+/* ---------- IK de 2 ossos: leva o pulso até um ponto no espaço do tronco ---------- */
+const DOWN = new THREE.Vector3(0, -1, 0);
+const _t = new THREE.Vector3(), _p = new THREE.Vector3(), _e = new THREE.Vector3(), _dU = new THREE.Vector3(), _dF = new THREE.Vector3();
+const _q = new THREE.Quaternion();
+function solveArm(tag, side, T) {
+  const sh = J['sh' + tag], el = J['el' + tag], a = ARM_U, b = ARM_F;
+  const dv = _t.copy(T).sub(sh.position);
+  const d = Math.min(Math.max(dv.length(), 0.08), (a + b) * 0.995);
+  const u = dv.normalize();
+  const along = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - along * along));
+  _p.set(side * 0.7, -1, -0.25);
+  _p.addScaledVector(u, -_p.dot(u)).normalize();
+  _e.copy(sh.position).addScaledVector(u, along).addScaledVector(_p, h);
+  _dU.copy(_e).sub(sh.position).normalize();
+  _dF.copy(sh.position).addScaledVector(u, d).sub(_e).normalize();
+  sh.quaternion.setFromUnitVectors(DOWN, _dU);
+  _q.copy(sh.quaternion).invert();
+  _dF.applyQuaternion(_q);
+  el.quaternion.setFromUnitVectors(DOWN, _dF);
+}
+
+/* ---------- animações ---------- */
+const JOINTS = [
+  ['root', 'Quadril', 'YXZ'], ['spine', 'Coluna', 'YXZ'], ['neck', 'Pescoço', 'YXZ'], ['head', 'Cabeça', 'YXZ'],
+  ['shL', 'Ombro E', 'ZXY'], ['elL', 'Cotovelo E', 'ZXY'], ['shR', 'Ombro D', 'ZXY'], ['elR', 'Cotovelo D', 'ZXY'],
+  ['hipL', 'Coxa E', 'ZXY'], ['knL', 'Joelho E', 'ZXY'], ['anL', 'Tornozelo E', 'ZXY'],
+  ['hipR', 'Coxa D', 'ZXY'], ['knR', 'Joelho D', 'ZXY'], ['anR', 'Tornozelo D', 'ZXY'],
+];
+JOINTS.forEach(j => J[j[0]].rotation.order = j[2]);
+
+const sm = x => x * x * (3 - 2 * x);
+const clamp01 = x => Math.max(0, Math.min(1, x));
+const mx = Math.max;
+
+/* pose = { j:{nome:[x,y,z]}, gun:bool, aim, rec, pump, flash } */
+function lerpPose(a, b, f) {
+  const out = { j: {}, gun: a.gun, fk: a.fk };
+  const names = new Set([...Object.keys(a.j || {}), ...Object.keys(b.j || {})]);
+  names.forEach(n => {
+    const p = (a.j && a.j[n]) || [0, 0, 0], q = (b.j && b.j[n]) || [0, 0, 0];
+    out.j[n] = [0, 1, 2].map(i => p[i] + (q[i] - p[i]) * f);
+  });
+  out.prop = a.prop;
+  ['aim', 'rec', 'pump', 'flash', 'lift', 'dz', 'load', 'tilt'].forEach(k => out[k] = (a[k] || 0) + ((b[k] || 0) - (a[k] || 0)) * f);
+  return out;
+}
+function keyAnim(list) {
+  return t => {
+    let i = 0;
+    while (i < list.length - 2 && t >= list[i + 1][0]) i++;
+    const [t0, p0] = list[i], [t1, p1] = list[i + 1];
+    const f = sm(clamp01((t - t0) / (t1 - t0 || 1)));
+    return lerpPose(p0, p1, f);
+  };
+}
+const P = (j, o = {}) => Object.assign({ j: Object.assign({ shL: [0, 0, 8], shR: [0, 0, -8], elL: [-14, 0, 0], elR: [-14, 0, 0] }, j), gun: true }, o);
+const SH = (x = 0) => ({ shL: [x, 0, 6], shR: [x, 0, -6] });
+
+const ANIMS = {
+  idle: { label: 'Parado', frames: 8, loop: true, fn: t => {
+    const s = Math.sin(t * 2 * Math.PI);
+    return P({ spine: [1.5 * s, 0, 0], head: [-1.5 * s, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4], root: [0, 0, 0] }, { aim: 0 });
+  } },
+  walk: { label: 'Andar', frames: 8, loop: true, fn: t => {
+    const f = t * 2 * Math.PI, s = Math.sin(f), c = Math.cos(f);
+    const hL = -30 * s, hR = 30 * s, kL = 8 + 36 * mx(0, c), kR = 8 + 36 * mx(0, -c);
+    return P({
+      root: [0, -5 * s, 0], spine: [4, 5 * s, 0], head: [-3, -4 * s, 0],
+      shL: [-hL * 0.9, 0, 8], shR: [-hR * 0.9, 0, -8], elL: [-18, 0, 0], elR: [-18, 0, 0],
+      hipL: [hL, 0, 3], hipR: [hR, 0, -3], knL: [kL, 0, 0], knR: [kR, 0, 0],
+      anL: [-(hL + kL) * 0.7, 0, 0], anR: [-(hR + kR) * 0.7, 0, 0],
+    }, { aim: 0, rec: 0 });
+  } },
+  run: { label: 'Correr', frames: 8, loop: true, fn: t => {
+    const f = t * 2 * Math.PI, s = Math.sin(f), c = Math.cos(f);
+    const hL = -52 * s, hR = 52 * s, kL = 18 + 80 * mx(0, c), kR = 18 + 80 * mx(0, -c);
+    return P({
+      root: [0, -9 * s, 0], spine: [14, 9 * s, 0], head: [-12, -6 * s, 0],
+      shL: [-hL * 0.9, 0, 6], shR: [-hR * 0.9, 0, -6], elL: [-75, 0, 0], elR: [-75, 0, 0],
+      hipL: [hL, 0, 3], hipR: [hR, 0, -3], knL: [kL, 0, 0], knR: [kR, 0, 0],
+      anL: [-(hL + kL) * 0.55, 0, 0], anR: [-(hR + kR) * 0.55, 0, 0],
+    }, { aim: 0, rec: 0 });
+  } },
+  reload: { label: 'Recarregar', frames: 12, loop: true, fn: keyAnim([
+    [0.00, P({ hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0 })],
+    [0.12, P({ spine: [4, 0, 0], head: [14, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 1, tilt: 1, pump: 0 })],
+    [0.22, P({ spine: [7, 0, 0], head: [18, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 2, tilt: 1, pump: 0 })],
+    [0.32, P({ spine: [4, 0, 0], head: [14, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 1, tilt: 1, pump: 0 })],
+    [0.42, P({ spine: [7, 0, 0], head: [18, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 2, tilt: 1, pump: 0 })],
+    [0.52, P({ spine: [4, 0, 0], head: [14, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 1, tilt: 1, pump: 0 })],
+    [0.62, P({ spine: [7, 0, 0], head: [18, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 2, tilt: 1, pump: 0 })],
+    [0.70, P({ spine: [4, 0, 0], head: [14, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 1, tilt: 1, pump: 0 })],
+    [0.78, P({ spine: [4, 0, 0], head: [4, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 0, tilt: 0.2, pump: 0 })],
+    [0.85, P({ spine: [4, 0, 0], head: [0, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 0, tilt: 0, pump: 1 })],
+    [0.92, P({ spine: [4, 0, 0], head: [0, 6, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0.2, load: 0, tilt: 0, pump: 0 })],
+    [1.00, P({ hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0 })],
+  ]) },
+  look: { label: 'Olhar os lados', frames: 10, loop: true, fn: keyAnim([
+    [0.00, P({ spine: [2, 0, 0], head: [-3, 0, 0], root: [0, 0.0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0 })],
+    [0.18, P({ spine: [2, 14, 0], head: [-3, 52, 0], root: [0, 4.2, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0 })],
+    [0.38, P({ spine: [2, 16, 0], head: [-6, 58, 0], root: [0, 4.8, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0 })],
+    [0.58, P({ spine: [2, -14, 0], head: [-3, -52, 0], root: [0, -4.2, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0 })],
+    [0.80, P({ spine: [2, -16, 0], head: [-6, -58, 0], root: [0, -4.8, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0 })],
+    [1.00, P({ spine: [2, 0, 0], head: [-3, 0, 0], root: [0, 0.0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { aim: 0 })],
+  ]) },
+  shoot: { label: 'Atirar', frames: 8, loop: true, fn: t => {
+    const rec = t < 0.12 ? t / 0.12 : mx(0, 1 - (t - 0.12) / 0.4);
+    const pump = t > 0.45 && t < 0.85 ? Math.sin((t - 0.45) / 0.4 * Math.PI) : 0;
+    return P({
+      spine: [-3 * rec, 8, 0], head: [-3 + 2 * rec, -8, 0], root: [0, 6, 0],
+      hipL: [-6, 0, 8], hipR: [8, 0, -8], knL: [10, 0, 0], knR: [14, 0, 0],
+      shR: [6, 0, -16], elR: [-24, 0, 0], shL: [-8, 0, 14], elL: [-30, 0, 0],
+    }, { aim: 1, rec, pump, flash: t < 0.1 ? 1 : 0 });
+  } },
+  glory: { label: 'Glory Kill', frames: 12, loop: true, fn: keyAnim([
+    [0.00, { j: { spine: [4, 0, 0], shL: [-30, 0, 20], elL: [-50, 0, 0], shR: [-30, 0, -20], elR: [-50, 0, 0], hipL: [-10, 0, 6], hipR: [14, 0, -6], knL: [12, 0, 0], knR: [16, 0, 0] } }],
+    [0.25, { j: { spine: [6, -22, 0], root: [0, -10, 0], shR: [40, 0, -40], elR: [-95, 0, 0], shL: [-60, 0, 30], elL: [-60, 0, 0], hipL: [-14, 0, 8], hipR: [18, 0, -8], knL: [18, 0, 0], knR: [24, 0, 0], head: [0, 12, 0] } }],
+    [0.40, { j: { spine: [14, 28, 0], root: [0, 14, 0], shR: [-95, 0, -8], elR: [-8, 0, 0], shL: [30, 0, 30], elL: [-70, 0, 0], hipL: [-22, 0, 8], hipR: [30, 0, -8], knL: [26, 0, 0], knR: [34, 0, 0], head: [-6, -18, 0] } }],
+    [0.55, { j: { spine: [10, 24, 0], root: [0, 12, 0], shR: [-80, 0, -10], elR: [-10, 0, 0], shL: [30, 0, 30], elL: [-70, 0, 0], hipL: [-22, 0, 8], hipR: [30, 0, -8], knL: [26, 0, 0], knR: [34, 0, 0] } }],
+    [0.80, { j: { spine: [6, 0, 0], shR: [-30, 0, -20], elR: [-50, 0, 0], shL: [-30, 0, 20], elL: [-50, 0, 0], hipL: [-10, 0, 6], hipR: [14, 0, -6], knL: [12, 0, 0], knR: [16, 0, 0] } }],
+    [1.00, { j: { spine: [4, 0, 0], shL: [-30, 0, 20], elL: [-50, 0, 0], shR: [-30, 0, -20], elR: [-50, 0, 0], hipL: [-10, 0, 6], hipR: [14, 0, -6], knL: [12, 0, 0], knR: [16, 0, 0] } }],
+  ].map(([t, p]) => [t, Object.assign({ gun: false }, p)])) },
+  hurt: { label: 'Dano', frames: 6, loop: false, fn: keyAnim([
+    [0.0, P({}, { aim: 0 })],
+    [0.3, P({ spine: [-16, -6, 0], head: [-24, 8, 0], root: [-4, 0, 0], hipL: [-8, 0, 6], hipR: [14, 0, -6], knL: [14, 0, 0], knR: [22, 0, 0] }, { aim: 0, rec: 0.6 })],
+    [1.0, P({}, { aim: 0 })],
+  ]) },
+  held: { label: 'Pego (drag)', frames: 2, loop: true, fn: keyAnim([
+    [0.0, P({ spine: [-4, 0, 6], head: [14, 0, 8], root: [0, 0, 6], shL: [-35, 0, 62], shR: [-10, 0, -50], elL: [-40, 0, 0], elR: [-25, 0, 0], hipL: [10, 0, 8], hipR: [-6, 0, -6], knL: [8, 0, 0], knR: [22, 0, 0], anL: [30, 0, 0], anR: [38, 0, 0] }, { gun: false, aim: 0 })],
+    [0.5, P({ spine: [-4, 0, -6], head: [14, 0, -8], root: [0, 0, -6], shL: [-10, 0, 50], shR: [-35, 0, -62], elL: [-25, 0, 0], elR: [-40, 0, 0], hipL: [-6, 0, 6], hipR: [10, 0, -8], knL: [22, 0, 0], knR: [8, 0, 0], anL: [38, 0, 0], anR: [30, 0, 0] }, { gun: false, aim: 0 })],
+    [1.0, P({ spine: [-4, 0, 6], head: [14, 0, 8], root: [0, 0, 6], shL: [-35, 0, 62], shR: [-10, 0, -50], elL: [-40, 0, 0], elR: [-25, 0, 0], hipL: [10, 0, 8], hipR: [-6, 0, -6], knL: [8, 0, 0], knR: [22, 0, 0], anL: [30, 0, 0], anR: [38, 0, 0] }, { gun: false, aim: 0 })],
+  ]) },
+  pet: { label: 'Carinho', frames: 2, loop: true, fn: keyAnim([
+    [0.0, P({ spine: [34, 0, 0], head: [-18, 0, 0], root: [0, 0, 0], hipL: [-62, 0, 4], hipR: [-34, 0, -4], knL: [96, 0, 0], knR: [108, 0, 0], anL: [-24, 0, 0], anR: [-10, 0, 0], shL: [-8, 0, 14], elL: [-20, 0, 0], shR: [-62, 0, -6], elR: [-22, 0, 0] }, { gun: false, aim: 0 })],
+    [0.5, P({ spine: [34, 0, 0], head: [-18, 0, 0], root: [0, 0, 0], hipL: [-62, 0, 4], hipR: [-34, 0, -4], knL: [96, 0, 0], knR: [108, 0, 0], anL: [-24, 0, 0], anR: [-10, 0, 0], shL: [-8, 0, 14], elL: [-20, 0, 0], shR: [-84, 0, -6], elR: [-10, 0, 0] }, { gun: false, aim: 0 })],
+    [1.0, P({ spine: [34, 0, 0], head: [-18, 0, 0], root: [0, 0, 0], hipL: [-62, 0, 4], hipR: [-34, 0, -4], knL: [96, 0, 0], knR: [108, 0, 0], anL: [-24, 0, 0], anR: [-10, 0, 0], shL: [-8, 0, 14], elL: [-20, 0, 0], shR: [-62, 0, -6], elR: [-22, 0, 0] }, { gun: false, aim: 0 })],
+  ]) },
+  death: { label: 'Morte', frames: 10, loop: false, fn: keyAnim([
+    [0.00, P({}, { aim: 0 })],
+    [0.20, P({ spine: [-14, 0, 0], head: [-26, 0, 0], root: [-10, 0, 0], hipL: [-12, 0, 6], hipR: [8, 0, -6], knL: [24, 0, 0], knR: [30, 0, 0], shL: [0, 0, 50], shR: [0, 0, -50] }, { gun: false })],
+    [0.55, P({ spine: [-10, 0, 0], head: [-14, 0, 0], root: [-48, 0, 0], hipL: [-50, 0, 8], hipR: [-30, 0, -8], knL: [70, 0, 0], knR: [55, 0, 0], shL: [-20, 0, 70], shR: [-10, 0, -70], elL: [-30, 0, 0], elR: [-20, 0, 0] }, { gun: false })],
+    [1.00, P({ spine: [-4, 0, 0], head: [-8, 0, 0], root: [-88, 0, 0], hipL: [-4, 0, 8], hipR: [2, 0, -10], knL: [14, 0, 0], knR: [6, 0, 0], shL: [0, 0, 80], shR: [0, 0, -75], elL: [-8, 0, 0], elR: [-14, 0, 0] }, { gun: false })],
+  ]) },
+};
+const J_UP = (o, e) => P(o, Object.assign({ aim: 0.3, prop: 'up' }, e));
+const J_DN = (o, e) => P(o, Object.assign({ aim: 0.3, prop: 'down' }, e));
+ANIMS.jumpUp = { label: 'Pular p/ cima', frames: 12, loop: false, yaw: 90, fn: keyAnim([
+  [0.00, J_UP({ spine: [4, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { dz: -0.55 })],
+  [0.16, J_UP({ spine: [28, 0, 0], head: [-18, 0, 0], hipL: [-70, 0, 4], hipR: [-70, 0, -4], knL: [115, 0, 0], knR: [115, 0, 0], anL: [-40, 0, 0], anR: [-40, 0, 0] }, { dz: -0.55, aim: 0 })],
+  [0.34, J_UP({ spine: [8, 0, 0], head: [-8, 0, 0], hipL: [-25, 0, 4], hipR: [-10, 0, -4], knL: [30, 0, 0], knR: [20, 0, 0], anL: [30, 0, 0], anR: [30, 0, 0] }, { dz: -0.38, lift: 0.4 })],
+  [0.55, J_UP({ spine: [16, 0, 0], head: [-14, 0, 0], hipL: [-95, 0, 4], hipR: [-50, 0, -4], knL: [105, 0, 0], knR: [95, 0, 0], anL: [10, 0, 0], anR: [20, 0, 0] }, { dz: 0.0, lift: 1.02 })],
+  [0.75, J_UP({ spine: [12, 0, 0], hipL: [-45, 0, 4], hipR: [-5, 0, -4], knL: [55, 0, 0], knR: [40, 0, 0], anL: [-5, 0, 0], anR: [10, 0, 0] }, { dz: 0.42, lift: 0.78 })],
+  [0.88, J_UP({ spine: [24, 0, 0], head: [-14, 0, 0], hipL: [-55, 0, 4], hipR: [-55, 0, -4], knL: [80, 0, 0], knR: [80, 0, 0], anL: [-28, 0, 0], anR: [-28, 0, 0] }, { dz: 0.62, lift: LEDGE_H, aim: 0 })],
+  [1.00, J_UP({ spine: [4, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { dz: 0.62, lift: LEDGE_H })],
+]) };
+ANIMS.jumpDown = { label: 'Pular p/ baixo', frames: 12, loop: false, yaw: 90, fn: keyAnim([
+  [0.00, J_DN({ spine: [4, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { dz: -0.55, lift: LEDGE_H })],
+  [0.16, J_DN({ spine: [8, 0, 0], hipL: [-35, 0, 4], hipR: [8, 0, -4], knL: [30, 0, 0], knR: [14, 0, 0] }, { dz: -0.2, lift: LEDGE_H })],
+  [0.32, J_DN({ spine: [4, 0, 0], head: [-6, 0, 0], hipL: [-30, 0, 4], hipR: [-18, 0, -4], knL: [35, 0, 0], knR: [38, 0, 0], shL: [0, 0, 20], shR: [0, 0, -20] }, { dz: 0.12, lift: 0.62, aim: 0 })],
+  [0.52, J_DN({ spine: [2, 0, 0], head: [-8, 0, 0], hipL: [-24, 0, 6], hipR: [-12, 0, -6], knL: [40, 0, 0], knR: [34, 0, 0], anL: [24, 0, 0], anR: [30, 0, 0] }, { dz: 0.36, lift: 0.2, aim: 0 })],
+  [0.64, J_DN({ spine: [32, 0, 0], head: [-22, 0, 0], hipL: [-80, 0, 6], hipR: [-80, 0, -6], knL: [120, 0, 0], knR: [120, 0, 0], anL: [-38, 0, 0], anR: [-38, 0, 0] }, { dz: 0.5, lift: 0, aim: 0 })],
+  [0.84, J_DN({ spine: [14, 0, 0], hipL: [-34, 0, 4], hipR: [-34, 0, -4], knL: [52, 0, 0], knR: [52, 0, 0], anL: [-14, 0, 0], anR: [-14, 0, 0] }, { dz: 0.58, lift: 0 })],
+  [1.00, J_DN({ spine: [4, 0, 0], hipL: [0, 0, 4], hipR: [0, 0, -4] }, { dz: 0.6, lift: 0 })],
+]) };
+const ANIM_KEYS = Object.keys(ANIMS);
+
+/* ---------- estado ---------- */
+const state = { anim: 'walk', t: 0, frame: 0, playing: true, speed: 1, yaw: 35, pitch: 10, outline: true, dither: true,
+                sel: 'root', manual: null };
+
+function poseAt(anim, frame) {
+  const A = ANIMS[anim];
+  const t = A.loop ? frame / A.frames : frame / (A.frames - 1);
+  return A.fn(Math.min(t, 1));
+}
+function currentPose() {
+  if (state.manual) return state.manual;
+  const A = ANIMS[state.anim];
+  const t = A.loop ? state.t : Math.min(state.t, 1);
+  return A.fn(t);
+}
+
+const _v = new THREE.Vector3(), _w = new THREE.Vector3();
+function groundFeet(lift = 0) {
+  J.root.position.y = 1.0;
+  model.updateMatrixWorld(true);
+  let minY = Infinity;
+  for (const m of allMeshes) {
+    if (!m.visible) continue;
+    const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i += 2) {
+      _w.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      if (_w.y < minY) minY = _w.y;
+    }
+  }
+  J.root.position.y = 1.0 - minY + lift;
+  model.updateMatrixWorld(true);
+}
+
+function applyPose(p) {
+  JOINTS.forEach(([n]) => {
+    const a = (p.j && p.j[n]) || [0, 0, 0];
+    J[n].rotation.set(a[0] * D2R, a[1] * D2R, a[2] * D2R);
+  });
+  G.visible = false;
+  const aim = p.aim || 0, rec = p.rec || 0;
+  J.cannon.rotation.set(-0.35 + 0.3 * aim - 0.06 * rec, 0, 0);       // repouso: aponta para cima/trás; aim 1: para a frente
+  J.cannon.position.z = -0.1 - 0.07 * rec;
+  J.cannon.userData.flash.visible = (p.flash || 0) > 0.5;
+  model.rotation.y = state.yaw * D2R;
+  rig.rotation.x = -state.pitch * D2R;
+  groundFeet(p.lift || 0);
+  const dz = p.dz || 0;
+  model.position.set(Math.sin(state.yaw * D2R) * dz, 0, Math.cos(state.yaw * D2R) * dz);
+  props.rotation.y = state.yaw * D2R;
+  rig.position.set(Math.sin(state.yaw * D2R) * dz * 0.9, 0.95 + (p.lift || 0), Math.cos(state.yaw * D2R) * dz * 0.9);
+  props.visible = !!p.prop;
+  if (p.prop) {
+    ledgeM.position.z = p.prop === 'up' ? LEDGE_EDGE + 0.8 : LEDGE_EDGE - 0.8;
+    model.updateMatrixWorld(true);
+  }
+  model.updateMatrixWorld(true);
+}
+
+/* ---------- renderização pixel ---------- */
+function fitDepthRange() {
+  rig.updateMatrixWorld(true);
+  const r = 1.4;      // esfera de segurança em volta do rig
+  cam.near = 6 - r; cam.far = 6 + r;
+  cam.updateProjectionMatrix();
+}
+function pass(kind, w, h) {
+  renderer.setSize(w, h, false);
+  renderer.setClearColor(0x000000, 1);
+  scene.overrideMaterial = kind === 'lit' ? litMat : kind === 'depth' ? depthMat : null;
+  renderer.render(scene, cam);
+  scene.overrideMaterial = null;
+  const buf = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+  return buf;
+}
+const FLASH_ID = PART_ID.flash;
+function composePixel(w, h, o) {
+  fitDepthRange();
+  const lit = pass('lit', w, h), idb = pass('id', w, h), dep = pass('depth', w, h);
+  const n = w * h, ids = new Uint8Array(n), dp = new Uint8Array(n), L = new Float32Array(n);
+  for (let y = 0; y < h; y++) {
+    const row = (h - 1 - y) * w;
+    for (let x = 0; x < w; x++) {
+      const i = (row + x) * 4, k = y * w + x;
+      ids[k] = Math.round(idb[i] / 16); dp[k] = dep[i]; L[k] = lit[i] / 255;
+    }
+  }
+  const img = new ImageData(w, h), d = img.data;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const k = y * w + x, id = ids[k], q = k * 4;
+    let c = null;
+    if (id && RAMP[id]) {
+      let l = L[k];
+      if (o.dither) l += BAYER[(y & 3) * 4 + (x & 3)] * 0.12;
+      c = id === FLASH_ID ? RAMP[id][2] : RAMP[id][l < T1 ? 0 : l < T2 ? 1 : 2];
+    }
+    if (o.outline) {
+      const nb = [x > 0 ? k - 1 : -1, x < w - 1 ? k + 1 : -1, y > 0 ? k - w : -1, y < h - 1 ? k + w : -1];
+      let edge = false;
+      for (const m of nb) {
+        if (m < 0 || ids[m] === id) continue;
+        if (!id) { edge = true; break; }
+        if (ids[m] && dp[k] + 3 < dp[m]) { edge = true; break; }
+      }
+      if (edge) c = INK;
+    }
+    if (c) { d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = 255; }
+  }
+  return img;
+}
+function renderPose(p, w, h) {
+  applyPose(p);
+  return composePixel(w, h, state);
+}
+
+/* ---------- loop de tela ---------- */
+function draw() {
+  const p = currentPose();
+  const img = renderPose(p, W, H);
+  view.width = W; view.height = H;
+  vctx.putImageData(img, 0, 0);
+  syncJointSliders();
+}
+function layoutStage() {
+  const room = Math.min(window.innerWidth - 40, window.innerHeight - 300, 640);
+  const s = Math.max(1, Math.floor(room / W));
+  stage.style.width = W * s + 'px'; stage.style.height = H * s + 'px';
+}
+let last = performance.now(), dirty = true;
+function tick(now) {
+  const dt = (now - last) / 1000; last = now;
+  const A = ANIMS[state.anim];
+  if (state.playing && !state.manual) {
+    const dur = A.frames / 10 / state.speed;     // 10 quadros por segundo
+    state.t += dt / dur;
+    if (A.loop) state.t %= 1; else if (state.t > 1) state.t = 0 ;
+    const f = Math.floor(state.t * (A.loop ? A.frames : A.frames - 1) + 0.0001);
+    if (f !== state.frame) { state.frame = f; syncFrameUI(); }
+    dirty = true;
+  }
+  if (dirty) { dirty = false; draw(); }
+  requestAnimationFrame(tick);
+}
+const queue = () => { dirty = true; };
+
+/* ---------- UI ---------- */
+function setAnim(k) {
+  state.anim = k; state.t = 0; state.frame = 0; state.manual = null;
+  if (ANIMS[k].yaw != null) setYaw(ANIMS[k].yaw);
+  const A = ANIMS[k];
+  $('frame').max = A.frames - 1;
+  document.querySelectorAll('#anims button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k));
+  syncFrameUI(); queue();
+}
+function syncFrameUI() {
+  const A = ANIMS[state.anim];
+  $('frame').value = state.frame; $('frameo').textContent = (state.frame + 1) + '/' + A.frames;
+}
+function setFrame(f) {
+  const A = ANIMS[state.anim];
+  state.frame = (f + A.frames) % A.frames;
+  state.t = A.loop ? state.frame / A.frames : state.frame / (A.frames - 1);
+  state.manual = null; state.playing = false; $('play').setAttribute('aria-pressed', false); $('play').textContent = '▶ Tocar';
+  syncFrameUI(); queue();
+}
+ANIM_KEYS.forEach(k => {
+  const b = document.createElement('button'); b.textContent = ANIMS[k].label; b.dataset.k = k;
+  b.setAttribute('aria-pressed', false); b.onclick = () => setAnim(k); $('anims').appendChild(b);
+});
+$('play').onclick = () => {
+  state.playing = !state.playing; state.manual = state.playing ? null : state.manual;
+  $('play').setAttribute('aria-pressed', state.playing); $('play').textContent = state.playing ? '⏸ Pausar' : '▶ Tocar';
+};
+$('prev').onclick = () => setFrame(state.frame - 1);
+$('next').onclick = () => setFrame(state.frame + 1);
+$('frame').oninput = e => setFrame(+e.target.value);
+$('speed').oninput = e => { state.speed = +e.target.value; $('speedo').textContent = state.speed + '×'; };
+
+[['Perfil →', 90], ['3/4 frente', 35], ['Frente', 0], ['Costas', 180], ['Perfil ←', 270]].forEach(([l, y]) => {
+  const b = document.createElement('button'); b.textContent = l;
+  b.onclick = () => { setYaw(y); }; $('views').appendChild(b);
+});
+function setYaw(y) { state.yaw = ((y % 360) + 360) % 360; $('yaw').value = Math.round(state.yaw); $('yawo').textContent = Math.round(state.yaw) + '°'; queue(); }
+$('yaw').oninput = e => setYaw(+e.target.value);
+$('pitch').oninput = e => { state.pitch = +e.target.value; $('pitcho').textContent = state.pitch + '°'; queue(); };
+$('t-outline').onchange = e => { state.outline = e.target.checked; queue(); };
+$('t-dither').onchange = e => { state.dither = e.target.checked; queue(); };
+$('res').onchange = e => { W = H = +e.target.value; layoutStage(); queue(); };
+window.addEventListener('resize', () => { layoutStage(); queue(); });
+
+/* articulações: ler os ângulos atuais; editar congela a pose em modo FK */
+JOINTS.forEach(([k, label]) => {
+  const b = document.createElement('button'); b.textContent = label; b.dataset.k = k;
+  b.setAttribute('aria-pressed', k === state.sel);
+  b.onclick = () => { state.sel = k; document.querySelectorAll('#joints button').forEach(c => c.setAttribute('aria-pressed', c.dataset.k === k)); syncJointSliders(); };
+  $('joints').appendChild(b);
+});
+let editing = false;
+function syncJointSliders() {
+  if (editing) return;
+  const r = J[state.sel].rotation;
+  ['x', 'y', 'z'].forEach(ax => { const v = Math.round(r[ax] / D2R); $('j' + ax).value = v; $('j' + ax + 'o').textContent = v + '°'; });
+}
+['x', 'y', 'z'].forEach((ax, i) => {
+  $('j' + ax).oninput = e => {
+    if (!state.manual) {              // congela a pose atual (inclusive braços resolvidos por IK) em FK
+      const cur = currentPose(), j = {};
+      JOINTS.forEach(([n]) => { const r = J[n].rotation; j[n] = [r.x / D2R, r.y / D2R, r.z / D2R]; });
+      state.manual = Object.assign({}, cur, { j, fk: true });
+      state.playing = false; $('play').setAttribute('aria-pressed', false); $('play').textContent = '▶ Tocar';
+    }
+    const a = state.manual.j[state.sel].slice(); a[i] = +e.target.value; state.manual.j[state.sel] = a;
+    $('j' + ax + 'o').textContent = a[i] + '°';
+    editing = true; draw(); editing = false;
+  };
+});
+
+/* arrastar o palco gira o boneco */
+let drag = null;
+stage.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, yaw: state.yaw, pitch: state.pitch }; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove', e => {
+  if (!drag) return;
+  setYaw(drag.yaw + (e.clientX - drag.x) * 0.9);
+  state.pitch = Math.max(-25, Math.min(50, drag.pitch + (e.clientY - drag.y) * 0.4));
+  $('pitch').value = Math.round(state.pitch); $('pitcho').textContent = Math.round(state.pitch) + '°';
+});
+stage.addEventListener('pointerup', () => drag = null);
+stage.addEventListener('pointercancel', () => drag = null);
+
+PARTS.forEach(p => {
+  const li = document.createElement('li'), n = document.createElement('span'), sw = document.createElement('span');
+  n.textContent = p[1]; sw.className = 'sw';
+  p[2].forEach(c => { const i = document.createElement('i'); i.style.background = c; sw.appendChild(i); });
+  li.append(n, sw); $('pal').appendChild(li);
+});
+
+/* ---------- exportação ---------- */
+const say = t => $('status').textContent = t;
+function toCanvas(img) { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').putImageData(img, 0, 0); return c; }
+function scaled(src, s) {
+  if (s === 1) return src;
+  const o = document.createElement('canvas'); o.width = src.width * s; o.height = src.height * s;
+  const g = o.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(src, 0, 0, o.width, o.height); return o;
+}
+function save(canvas, name) {
+  canvas.toBlob(b => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    say(name + ' · ' + canvas.width + '×' + canvas.height);
+  }, 'image/png');
+}
+const exScale = () => +$('scale').value;
+$('ex-frame').onclick = () => save(scaled(toCanvas(renderPose(currentPose(), W, H)), exScale()), `slayer-${state.anim}-${state.frame}.png`);
+$('ex-strip').onclick = () => {
+  const A = ANIMS[state.anim], c = document.createElement('canvas'); c.width = W * A.frames; c.height = H;
+  const g = c.getContext('2d');
+  for (let i = 0; i < A.frames; i++) g.putImageData(renderPose(poseAt(state.anim, i), W, H), i * W, 0);
+  save(scaled(c, exScale()), `slayer-${state.anim}-strip${A.frames}.png`);
+};
+$('ex-sheet').onclick = () => {
+  const keep = state.yaw, c = document.createElement('canvas'); c.width = W * 8; c.height = H;
+  const g = c.getContext('2d'), p = currentPose();
+  for (let i = 0; i < 8; i++) { state.yaw = i * 45; g.putImageData(renderPose(p, W, H), i * W, 0); }
+  state.yaw = keep; queue();
+  save(scaled(c, exScale()), `slayer-${state.anim}-8dir.png`);
+};
+
+/* usado por scripts/render_doom_sprites.py: renderiza um quadro com fundo transparente, sem cenário nem deslocamento */
+function renderAt(anim, t, yaw, pitch, res) {
+  state.yaw = yaw; state.pitch = pitch; W = H = res;
+  const pose = ANIMS[anim].fn(t);
+  if (pose.prop) pose.lift = 0;
+  pose.prop = null; pose.dz = 0;
+  return toCanvas(renderPose(pose, W, H)).toDataURL('image/png');
+}
+window.__rig = { renderAt, state, setAnim, setFrame, setYaw, queue, THREE, J, draw };
+layoutStage(); setAnim('walk'); requestAnimationFrame(tick);
+</script>
+</body>
+</html>

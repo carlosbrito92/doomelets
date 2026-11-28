@@ -17,9 +17,9 @@ import { DoomSlayer } from './characters/doom-slayer.mjs';
 import { Projectile } from './projectile.mjs';
 import { Portal } from './portal.mjs';
 import { PointerTracker, PortalGate } from './behavior.mjs';
-import { NOTICE_RANGE, PORTAL_DEMON_TTL, DEFAULT_TYPES } from './utils.mjs';
+import { NOTICE_RANGE, PORTAL_DEMON_TTL, DEFAULT_TYPES, SLAYER_TYPES } from './utils.mjs';
 
-const SLAYER = 'DoomSlayer';   // sempre exatamente um em cena quando selecionado
+const isSlayer = t => SLAYER_TYPES.includes(t);   // sempre exatamente um Slayer (clássico ou Eternal) em cena quando selecionado
 const DEMONS = ['Imp', 'Imp2', 'Cacodemon'];   // Imp2: variação visual do Imp (mesma classe e IA)
 
 export class GnomeletManager {
@@ -96,8 +96,13 @@ export class GnomeletManager {
 
     /** O Doom Slayer está selecionado e com sprites carregados? */
     _wantsSlayer() {
-        return Boolean(this._resources[SLAYER]) &&
-            this._settings.get_strv('gnomelet-type').includes(SLAYER);
+        return this._slayerType() !== null;
+    }
+
+    /** Qual Slayer entra em cena: o clássico tem prioridade se as duas versões estiverem marcadas. */
+    _slayerType() {
+        const sel = this._settings.get_strv('gnomelet-type');
+        return SLAYER_TYPES.find(t => this._resources[t] && sel.includes(t)) ?? null;
     }
 
     /**
@@ -113,7 +118,7 @@ export class GnomeletManager {
 
         let selectedTypes = this._settings.get_strv('gnomelet-type');
         if (!selectedTypes || selectedTypes.length === 0) selectedTypes = DEFAULT_TYPES;
-        let valid = selectedTypes.filter(t => t !== SLAYER && this._resources[t] &&
+        let valid = selectedTypes.filter(t => !isSlayer(t) && this._resources[t] &&
             !(originalsOnly && DEMONS.includes(t)));
         if (valid.length === 0) return null;
 
@@ -127,8 +132,8 @@ export class GnomeletManager {
         let count = this._settings.get_int('gnomelet-count');
         let current = this._gnomelets.length + this._demonQueue.length;
 
-        if (count > 0 && this._wantsSlayer() && !this._gnomelets.some(g => g._typeName === SLAYER)) {
-            this._addCharacter(this._pickResource(SLAYER));
+        if (count > 0 && this._wantsSlayer() && !this._gnomelets.some(g => isSlayer(g._typeName))) {
+            this._addCharacter(this._pickResource(this._slayerType()));
             current++;
         }
 
@@ -142,7 +147,7 @@ export class GnomeletManager {
             for (let i = 0; i < (current - count); i++) {
                 if (this._demonQueue.pop()) continue;
                 let idx = this._gnomelets.length - 1;
-                while (idx > 0 && this._gnomelets[idx]._typeName === SLAYER) idx--;
+                while (idx > 0 && isSlayer(this._gnomelets[idx]._typeName)) idx--;
                 let [p] = this._gnomelets.splice(idx, 1);
                 p.destroy();
             }
@@ -160,10 +165,11 @@ export class GnomeletManager {
         let stateToUse = savedState || [];
 
         if (count > 0 && this._wantsSlayer()) {
-            this._addCharacter(this._pickResource(SLAYER), stateToUse.find(d => d?.type === SLAYER));
+            const slayerType = this._slayerType();
+            this._addCharacter(this._pickResource(slayerType), stateToUse.find(d => d?.type === slayerType));
         }
 
-        let others = stateToUse.filter(d => d && d.type !== SLAYER);
+        let others = stateToUse.filter(d => d && !isSlayer(d.type));
         for (let i = 0; this._gnomelets.length < count; i++) {
             let saved = others[i];
             let instanceRes = this._pickResource(saved?.type) || this._pickResource();
@@ -353,7 +359,8 @@ export class GnomeletManager {
             case 'Imp':
             case 'Imp2':       p = new Imp(...args, cbFor('imp')); break;
             case 'Cacodemon':  p = new Cacodemon(...args, cbFor('caco')); break;
-            case 'DoomSlayer': p = new DoomSlayer(...args, cbFor('slayer')); break;
+            case 'DoomSlayer':
+            case 'DoomEternal': p = new DoomSlayer(...args, cbFor('slayer')); break;
             default:           return new Gnomelet(...args);
         }
         this._applyHealth(p, true);
@@ -377,7 +384,7 @@ export class GnomeletManager {
 
     _updateProjectiles() {
         if (this._projectiles.length === 0) return;
-        const slayers = this._gnomelets.filter(g => g._typeName === SLAYER);
+        const slayers = this._gnomelets.filter(g => isSlayer(g._typeName));
         const enemies = this._gnomelets.filter(g => DEMONS.includes(g._typeName));
         this._projectiles = this._projectiles.filter(p => {
             p.update(p.owner === 'slayer' ? enemies : slayers);

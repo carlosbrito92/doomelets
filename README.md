@@ -77,7 +77,7 @@ Restart GNOME Shell so it finds the extension (log out and back in on Wayland; p
 gnome-extensions enable doomelets@carlosbrito92.github.com
 ```
 
-Open the extension preferences and select `DoomSlayer`, `Imp` and `Cacodemon`. The default selection is those three. `Imp2` is an optional visual variation of the Imp (big-headed low-poly demon): same class, AI, health and moveset, only the sprites differ. It is off by default, and when selected it also drops from portals and counts as an enemy for the Slayer.
+Open the extension preferences and select `DoomSlayer`, `Imp` and `Cacodemon`. The default selection is those three. `DoomEternal` is an alternative Doom Slayer (stocky Eternal look: plasma launcher on the shoulder and an arm blade). It is a toggle with the classic Slayer: there is only ever one Slayer in play, and if both are selected the classic one wins (the GNOME preferences unticks the other one for you). It has the same class, AI, health and moveset; only the sprites differ. `Imp2` is an optional visual variation of the Imp (big-headed low-poly demon): same class, AI, health and moveset, only the sprites differ. It is off by default, and when selected it also drops from portals and counts as an enemy for the Slayer.
 
 The metadata declares support for GNOME Shell 45 to 50.
 

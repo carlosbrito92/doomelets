@@ -9,6 +9,7 @@ import {
     CACO_FOLLOW_SPEED,
     CACO_FOLLOW_ACCEL,
     platform,
+    SLAYER_TYPES,
 } from '../utils.mjs';
 import { steerToward } from '../behavior.mjs';
 
@@ -133,7 +134,7 @@ export class Cacodemon extends Gnomelet {
             (this._dropOffsetY || 0);
 
         // IA: detectar Slayer e disparar
-        const slayer = allEntities.find(e => e._typeName === 'DoomSlayer');
+        const slayer = allEntities.find(e => SLAYER_TYPES.includes(e._typeName));
         if (slayer && slayer.actor) {
             const dx = slayer._x - this._x;
             const dy = slayer._y - this._y;
@@ -164,7 +165,7 @@ export class Cacodemon extends Gnomelet {
     }
 
     _fire(allEntities) {
-        const slayer = allEntities.find(e => e._typeName === 'DoomSlayer');
+        const slayer = allEntities.find(e => SLAYER_TYPES.includes(e._typeName));
         if (!slayer || !slayer.actor) return;
         if (!this._spawnProjectileCb) {
             slayer.takeDamage(2);

@@ -6,6 +6,7 @@ import {
     WALK_SPEED,
     IMP_WALK_SPEED,
     IMP_CHASE_SPEED,
+    SLAYER_TYPES,
 } from '../utils.js';
 
 /**
@@ -50,7 +51,7 @@ export const Imp = GObject.registerClass(
         _pickNewAction() {
             // Procurar Slayer entre as entidades (injetadas via update())
             const slayer = this._allEntities
-                ? this._allEntities.find(e => e._typeName === 'DoomSlayer')
+                ? this._allEntities.find(e => SLAYER_TYPES.includes(e._typeName))
                 : null;
 
             if (slayer && slayer.actor) {
