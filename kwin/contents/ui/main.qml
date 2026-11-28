@@ -19,7 +19,7 @@ import "../code/sprites.mjs" as Sprites
 Item {
     id: root
 
-    readonly property var characterTypes: ["DoomSlayer", "Imp", "Cacodemon", "Daisy", "Pinky", "LostSoul"]
+    readonly property var characterTypes: ["DoomSlayer", "Imp", "Cacodemon", "Daisy", "Pinky", "LostSoul", "Imp2"]
     readonly property var floorModes: ["allow", "partial", "disallow"]
 
     property var manager: null
@@ -59,6 +59,7 @@ Item {
             "demon-respawn-max": Math.max(readInt("RespawnMin", 5), readInt("RespawnMax", 10)) * 20,
             "health-DoomSlayer": Math.max(1, readInt("SlayerHealth", 12)),
             "health-Imp": Math.max(1, readInt("ImpHealth", 3)),
+            "health-Imp2": Math.max(1, readInt("ImpHealth", 3)),
             "health-Cacodemon": Math.max(1, readInt("CacodemonHealth", 5)),
         };
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Renderiza os sprites do Doom Slayer, Imp, Cacodemon, Lost Soul, Pinky e Daisy a partir dos rigs three.js em demo/.
+"""Renderiza os sprites do Doom Slayer, Imp, Imp 2, Cacodemon, Lost Soul, Pinky e Daisy a partir dos rigs three.js em demo/.
 
 Requer: pip install playwright pillow && playwright install chromium
 Uso:    python3 scripts/render_doom_sprites.py [pasta_de_saida]   (padrão: src/images)
@@ -53,6 +53,18 @@ CHARS = {
         'pet': A(loop('pet', 4), 4),
     }),
     'Imp': dict(page='imp-rig.html', yaw=60, pitch=8, anims={
+        'walk': A(loop('walk', 8), 2),
+        'run': A(loop('run', 8), 1.5),
+        'idle': A(loop('idle', 6), 5),
+        'jump': A(seq('jumpUp', 0.34, 0.45, 0.55, 0.66), 3, False),
+        'fall': A(seq('jumpDown', 0.32, 0.42, 0.52), 3, False),
+        # a bola sai no meio do ataque: o quadro 4 é o do arremesso
+        'attack': A(seq('fireball', 0.10, 0.25, 0.40, 0.56, 0.72, 0.78, 0.87, 0.96), 2.5, False),
+        'hurt': A(HURT, 2, False),
+        'death': A(DEATH, 3, False),
+        'held': A(loop('held', 4), 4),
+    }),
+    'Imp2': dict(page='imp2-rig.html', yaw=50, pitch=8, anims={
         'walk': A(loop('walk', 8), 2),
         'run': A(loop('run', 8), 1.5),
         'idle': A(loop('idle', 6), 5),

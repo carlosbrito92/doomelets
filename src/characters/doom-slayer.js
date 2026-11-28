@@ -8,7 +8,7 @@ import {
     GUARD_AFTER_TICKS,
 } from '../utils.js';
 
-const ENEMY_TYPES = ['Imp', 'Cacodemon'];
+const ENEMY_TYPES = ['Imp', 'Imp2', 'Cacodemon'];
 // Variações de idle (null = só respirar). Pesos iguais = o sorteio uniforme de antes.
 const IDLE_VARIANTS = [{ name: 'reload', weight: 1 }, { name: 'look', weight: 1 }, { name: null, weight: 1 }];
 const PET_RANGE_X = 90;      // px — distância horizontal para fazer carinho
